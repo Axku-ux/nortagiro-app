@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2563eb;
+  --color-primary-container: #1d4ed8;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #eff6ff;
+
+  --color-secondary: #64748b;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #f1f5f9;
+  --color-on-secondary-container: #0f172a;
+
+  --color-tertiary: #10b981;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #d1fae5;
+  --color-on-tertiary-container: #065f46;
+  
+  --color-error: #ef4444;
+  --color-on-error: #ffffff;
+  --color-error-container: #fee2e2;
+  --color-on-error-container: #991b1b;
+
+  --color-background: #f8fafc;
+  --color-on-background: #1e293b;
+  
+  --color-surface: #ffffff;
+  --color-surface-dim: #f1f5f9;
+  --color-surface-bright: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f8fafc;
+  --color-surface-container: #f1f5f9;
+  --color-surface-container-high: #e2e8f0;
+  --color-surface-container-highest: #cbd5e1;
+  
+  --color-on-surface: #0f172a;
+  --color-on-surface-variant: #64748b;
+  
+  --color-outline: #94a3b8;
+  --color-outline-variant: #e2e8f0;
+
+  --color-chart-emerald: #10b981;
+  --color-chart-amber: #fbbf24;
+  --color-chart-coral: #fb7185;
+
+  --font-sans: "Geist", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-on-background font-sans antialiased;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white border border-slate-200 shadow-sm rounded-xl transition-all duration-200 hover:shadow-md hover:border-slate-300;
+  }
+}
