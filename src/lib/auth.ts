@@ -103,17 +103,69 @@ export async function fetchUserProfile(authUid: string): Promise<AuthUser | null
     .eq('auth_uid', authUid)
     .single();
 
-  if (error || !data) return null;
+  if (data) {
+    const userData = data as unknown as User;
+    return {
+      id: userData.id,
+      email: userData.email,
+      fullName: userData.full_name,
+      role: userData.role,
+      organizationId: userData.organization_id,
+    };
+  }
 
-  const userData = data as unknown as User;
+  // Auto-heal: If auth.users user exists but public.users row is missing
+  // (e.g. failed signup before RLS policy was added), auto-create org and user profile.
+  try {
+    const { data: authUserData } = await supabase.auth.getUser();
+    if (!authUserData?.user) return null;
 
-  return {
-    id: userData.id,
-    email: userData.email,
-    fullName: userData.full_name,
-    role: userData.role,
-    organizationId: userData.organization_id,
-  };
+    const email = authUserData.user.email || '';
+    const fullName = authUserData.user.user_metadata?.full_name || 'Admin';
+
+    // Get existing organization or create default one
+    let orgId: string;
+    const { data: existingOrgs } = await supabase.from('organizations').select('id').limit(1);
+    if (existingOrgs && existingOrgs.length > 0) {
+      orgId = (existingOrgs[0] as { id: string }).id;
+    } else {
+      const { data: newOrg, error: createOrgErr } = await supabase
+        .from('organizations')
+        .insert([{ name: 'NortaGiro Org', settings: {} }] as unknown as never[])
+        .select()
+        .single();
+      if (createOrgErr || !newOrg) return null;
+      orgId = (newOrg as { id: string }).id;
+    }
+
+    // Insert user into public.users
+    const { data: newUser, error: createErr } = await supabase
+      .from('users')
+      .insert([{
+        organization_id: orgId,
+        auth_uid: authUid,
+        email,
+        full_name: fullName,
+        role: 'admin',
+      }] as unknown as never[])
+      .select()
+      .single();
+
+    if (newUser) {
+      const uData = newUser as unknown as User;
+      return {
+        id: uData.id,
+        email: uData.email,
+        fullName: uData.full_name,
+        role: uData.role,
+        organizationId: uData.organization_id,
+      };
+    }
+  } catch (err) {
+    console.error('Auto-heal user profile error:', err);
+  }
+
+  return null;
 }
 
 /**
