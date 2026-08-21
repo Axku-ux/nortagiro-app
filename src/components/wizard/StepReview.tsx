@@ -44,10 +44,10 @@ export function StepReview({
     return acc;
   }, {});
 
-  const isValid = title.trim() && questions.length > 0 && audienceCount > 0;
+  const isValid = title.trim().length > 0 && questions.length > 0;
 
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-300 pb-32">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Review + Schedule */}
         <div className="lg:col-span-7 space-y-6">

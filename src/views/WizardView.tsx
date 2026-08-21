@@ -27,6 +27,10 @@ export function WizardView({ onBack }: { onBack: () => void }) {
   const [launching, setLaunching] = useState(false);
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
 
+  // Default dates: Today & 14 days later
+  const todayStr = new Date().toISOString().split('T')[0];
+  const defaultEndStr = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
   // Step 1: Config
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -35,9 +39,16 @@ export function WizardView({ onBack }: { onBack: () => void }) {
   // Step 2: Questions
   const [questions, setQuestions] = useState<QuestionDraft[]>(mockQuestions);
 
+  // Step 3: Audience Filters
+  const defaultDepts = segmentFields.find(f => f.field_name.toLowerCase().includes('departamento'))?.options || ['Tech', 'Sales', 'Ops', 'Marketing', 'General'];
+  const defaultLocs = segmentFields.find(f => f.field_name.toLowerCase().includes('ubicación') || f.field_name.toLowerCase().includes('location'))?.options || ['Sede Central', 'Madrid', 'Barcelona', 'Remoto'];
+  
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>(defaultDepts);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>(defaultLocs);
+
   // Step 4: Schedule + Review
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
+  const [startsAt, setStartsAt] = useState(todayStr);
+  const [endsAt, setEndsAt] = useState(defaultEndStr);
   const [reminderConfig, setReminderConfig] = useState<ReminderConfig>({
     enabled: true,
     first_reminder_days: 3,
@@ -50,13 +61,16 @@ export function WizardView({ onBack }: { onBack: () => void }) {
     switch (step) {
       case 1: return title.trim().length > 0;
       case 2: return questions.length > 0;
-      case 3: return true; // Audience is just informational now
+      case 3: return selectedDepartments.length > 0 && selectedLocations.length > 0;
+      case 4: return title.trim().length > 0 && questions.length > 0;
       default: return true;
     }
   };
 
   const goNext = () => {
-    if (currentStep < 4 && canProceed(currentStep)) {
+    if (currentStep === 4) {
+      handleLaunch();
+    } else if (currentStep < 4 && canProceed(currentStep)) {
       setCurrentStep((s) => s + 1);
     }
   };
@@ -75,12 +89,12 @@ export function WizardView({ onBack }: { onBack: () => void }) {
       const campaignId = await createCampaign({
         title,
         description,
-        periodLabel,
+        periodLabel: periodLabel || `Campaña ${startsAt} - ${endsAt}`,
         startsAt,
         endsAt,
         reminderConfig,
         questions,
-        audienceEmployeeIds: [], // Not used anymore for distribution
+        audienceEmployeeIds: [],
       });
 
       setCreatedCampaignId(campaignId);
@@ -158,9 +172,13 @@ export function WizardView({ onBack }: { onBack: () => void }) {
             title={title}
             description={description}
             periodLabel={periodLabel}
+            startsAt={startsAt}
+            endsAt={endsAt}
             onTitleChange={setTitle}
             onDescriptionChange={setDescription}
             onPeriodLabelChange={setPeriodLabel}
+            onStartsAtChange={setStartsAt}
+            onEndsAtChange={setEndsAt}
           />
         )}
         {currentStep === 2 && (
@@ -172,15 +190,19 @@ export function WizardView({ onBack }: { onBack: () => void }) {
         {currentStep === 3 && (
           <StepAudience
             segmentFields={segmentFields}
+            selectedDepartments={selectedDepartments}
+            selectedLocations={selectedLocations}
+            onDepartmentsChange={setSelectedDepartments}
+            onLocationsChange={setSelectedLocations}
           />
         )}
         {currentStep === 4 && (
           <StepReview
             title={title}
             description={description}
-            periodLabel={periodLabel}
+            periodLabel={periodLabel || `${startsAt} al ${endsAt}`}
             questions={questions}
-            audienceCount={0} // Irrelevant now
+            audienceCount={selectedDepartments.length * selectedLocations.length}
             startsAt={startsAt}
             endsAt={endsAt}
             reminderConfig={reminderConfig}
@@ -195,6 +217,8 @@ export function WizardView({ onBack }: { onBack: () => void }) {
           <StepLinks
             campaignId={createdCampaignId}
             segmentFields={segmentFields}
+            selectedDepartments={selectedDepartments}
+            selectedLocations={selectedLocations}
             onFinish={onBack}
           />
         )}
@@ -202,7 +226,7 @@ export function WizardView({ onBack }: { onBack: () => void }) {
 
       {/* Navigation footer */}
       {currentStep < 5 && (
-        <div className="max-w-6xl mx-auto mt-12 flex justify-between items-center border-t border-outline-variant pt-6 fixed bottom-0 left-0 md:left-64 right-0 bg-surface/80 backdrop-blur-md px-4 md:px-8 z-40 pb-6 md:pb-6">
+        <div className="max-w-6xl mx-auto flex justify-between items-center border-t border-outline-variant pt-4 fixed bottom-0 left-0 md:left-64 right-0 bg-surface/90 backdrop-blur-md px-4 md:px-8 z-40 pb-5">
           <button
             onClick={goBack}
             className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-secondary border border-outline-variant hover:bg-surface-variant transition-all text-sm font-medium"
@@ -212,16 +236,22 @@ export function WizardView({ onBack }: { onBack: () => void }) {
           </button>
           <button
             onClick={goNext}
-            disabled={!canProceed(currentStep)}
+            disabled={!canProceed(currentStep) || launching}
             className={cn(
-              "flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-medium transition-all",
-              canProceed(currentStep)
-                ? "bg-primary text-on-primary hover:bg-primary-container shadow-sm hover:shadow"
+              "flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm",
+              canProceed(currentStep) && !launching
+                ? "bg-primary text-on-primary hover:bg-primary-container shadow-md"
                 : "bg-surface-variant text-outline cursor-not-allowed"
             )}
           >
-            Siguiente
-            <ArrowRight className="w-[18px] h-[18px]" />
+            {launching ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <span>{currentStep === 4 ? 'Lanzar Campaña' : 'Siguiente'}</span>
+                <ArrowRight className="w-[18px] h-[18px]" />
+              </>
+            )}
           </button>
         </div>
       )}

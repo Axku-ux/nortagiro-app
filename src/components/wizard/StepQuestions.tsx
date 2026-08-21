@@ -59,7 +59,7 @@ export function StepQuestions({ questions, onQuestionsChange }: StepQuestionsPro
   }, {});
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6 animate-in fade-in duration-300 pb-32">
       {/* Summary badges */}
       <div className="flex flex-wrap gap-2">
         <span className="text-sm font-medium text-on-surface-variant">{questions.length} preguntas</span>
