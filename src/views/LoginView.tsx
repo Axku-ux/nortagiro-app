@@ -49,11 +49,11 @@ export function LoginView({ onLogin, onGoToRegister }: LoginViewProps) {
           </div>
           
           <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-6 tracking-tight">
-            El pulso de tu
+            Gure lankideon
             <br />
-            <span className="text-emerald-400">organización</span>,
+            <span className="text-emerald-400">iritziak eta nahiak</span>
             <br />
-            en tiempo real.
+            kudeatzeko lan tresna.
           </h1>
           
           <p className="text-slate-300 text-lg leading-relaxed max-w-md">
