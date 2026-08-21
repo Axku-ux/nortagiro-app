@@ -55,10 +55,7 @@ export function LoginView({ onLogin, onGoToRegister }: LoginViewProps) {
             <br />
             kudeatzeko lan tresna.
           </h1>
-          
-          <p className="text-slate-300 text-lg leading-relaxed max-w-md">
-            Gure NORTASUNA ahalbidetzeko tresna, ertzainen iritziak kudeatzeko lan tresna.
-          </p>
+
         </div>
       </div>
 
