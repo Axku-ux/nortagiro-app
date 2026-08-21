@@ -86,7 +86,7 @@ export function Sidebar({ currentView, onViewChange, userName, userRole, userEma
         {visibleItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => onViewChange(item.id === 'campaigns' ? 'wizard' : 'dashboard')}
+            onClick={() => onViewChange(item.id)}
             className={cn(
               "w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer",
               currentView === item.id || (item.id === 'campaigns' && currentView === 'wizard')
