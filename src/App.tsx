@@ -9,6 +9,8 @@ import { WizardView } from './views/WizardView';
 import { SurveyView } from './views/SurveyView';
 import { CampaignsView } from './views/CampaignsView';
 import { DirectoryView } from './views/DirectoryView';
+import { ReportingView } from './views/ReportingView';
+import { InsightsView } from './views/InsightsView';
 
 import { Home, Send, Eye, Loader2 } from 'lucide-react';
 
@@ -97,6 +99,8 @@ function AppShell({ user, onSignOut }: AppShellProps) {
           {currentView === 'wizard' && (
             <WizardView onBack={() => setCurrentView('campaigns')} />
           )}
+          {currentView === 'reporting' && <ReportingView />}
+          {currentView === 'insights' && <InsightsView />}
           {currentView === 'directory' && <DirectoryView />}
         </div>
 
