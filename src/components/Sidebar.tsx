@@ -56,7 +56,10 @@ export function Sidebar({ currentView, onViewChange, userName, userRole, userEma
         <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-slate-900 font-bold">
           <Activity className="w-5 h-5" />
         </div>
-        <span className="text-white font-bold text-lg tracking-tight">ClimaPulse 360</span>
+        <span className="font-bold text-lg tracking-tight">
+          <span className="text-white">Norta</span>
+          <span className="text-emerald-400">Giro</span>
+        </span>
       </div>
 
       {/* User Profile Section */}

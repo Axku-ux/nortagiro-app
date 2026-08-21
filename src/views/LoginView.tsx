@@ -42,7 +42,10 @@ export function LoginView({ onLogin, onGoToRegister }: LoginViewProps) {
             <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center">
               <Activity className="w-7 h-7 text-slate-900" />
             </div>
-            <span className="text-2xl font-bold tracking-tight">ClimaPulse 360</span>
+            <span className="text-2xl font-bold tracking-tight">
+              <span className="text-white">Norta</span>
+              <span className="text-emerald-400">Giro</span>
+            </span>
           </div>
           
           <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-6 tracking-tight">
@@ -53,22 +56,9 @@ export function LoginView({ onLogin, onGoToRegister }: LoginViewProps) {
             en tiempo real.
           </h1>
           
-          <p className="text-slate-400 text-lg leading-relaxed max-w-md">
-            Mide el clima laboral, detecta alertas tempranas y toma decisiones basadas en datos con insights impulsados por IA.
+          <p className="text-slate-300 text-lg leading-relaxed max-w-md">
+            Gure NORTASUNA ahalbidetzeko tresna, ertzainen iritziak kudeatzeko lan tresna.
           </p>
-          
-          <div className="mt-12 flex gap-8">
-            {[
-              { value: '94%', label: 'Satisfacción' },
-              { value: '+52', label: 'eNPS promedio' },
-              { value: '3min', label: 'Tiempo respuesta' },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <div className="text-2xl font-bold text-emerald-400">{stat.value}</div>
-                <div className="text-xs text-slate-500 uppercase tracking-wider font-medium mt-1">{stat.label}</div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -80,7 +70,10 @@ export function LoginView({ onLogin, onGoToRegister }: LoginViewProps) {
             <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
               <Activity className="w-6 h-6 text-slate-900" />
             </div>
-            <span className="text-xl font-bold text-on-background tracking-tight">ClimaPulse 360</span>
+            <span className="text-xl font-bold tracking-tight">
+              <span className="text-slate-900">Norta</span>
+              <span className="text-emerald-600">Giro</span>
+            </span>
           </div>
 
           <div className="mb-8">

@@ -69,7 +69,10 @@ export function RegisterView({ onRegister, onGoToLogin }: RegisterViewProps) {
             <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center">
               <Activity className="w-7 h-7 text-slate-900" />
             </div>
-            <span className="text-2xl font-bold tracking-tight">ClimaPulse 360</span>
+            <span className="text-2xl font-bold tracking-tight">
+              <span className="text-white">Norta</span>
+              <span className="text-emerald-400">Giro</span>
+            </span>
           </div>
           
           <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-6 tracking-tight">
@@ -107,7 +110,10 @@ export function RegisterView({ onRegister, onGoToLogin }: RegisterViewProps) {
             <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
               <Activity className="w-6 h-6 text-slate-900" />
             </div>
-            <span className="text-xl font-bold text-on-background tracking-tight">ClimaPulse 360</span>
+            <span className="text-xl font-bold tracking-tight">
+              <span className="text-slate-900">Norta</span>
+              <span className="text-emerald-600">Giro</span>
+            </span>
           </div>
 
           {/* Step indicator */}
