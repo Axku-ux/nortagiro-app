@@ -43,23 +43,19 @@ export async function signUp({ email, password, fullName, organizationName }: Si
   if (authError) throw authError;
   if (!authData.user) throw new Error('No se pudo crear el usuario.');
 
-  // 2. Create organization
-  const { data: org, error: orgError } = await supabase
+  // 2. Create organization with explicit UUID
+  const orgId = crypto.randomUUID();
+  const { error: orgError } = await supabase
     .from('organizations')
-    .insert([{ name: organizationName, settings: {} }] as unknown as never[])
-    .select()
-    .single();
+    .insert([{ id: orgId, name: organizationName, settings: {} }] as unknown as never[]);
 
   if (orgError) throw orgError;
-  if (!org) throw new Error('No se pudo crear la organización.');
-
-  const orgData = org as unknown as Organization;
 
   // 3. Create platform user linked to auth user
   const { error: userError } = await supabase
     .from('users')
     .insert([{
-      organization_id: orgData.id,
+      organization_id: orgId,
       auth_uid: authData.user.id,
       email,
       full_name: fullName,
@@ -68,7 +64,7 @@ export async function signUp({ email, password, fullName, organizationName }: Si
 
   if (userError) throw userError;
 
-  return { user: authData.user, organization: orgData };
+  return { user: authData.user, organizationId: orgId };
 }
 
 /**
@@ -97,11 +93,11 @@ export async function signOut() {
  * authenticated Supabase Auth user.
  */
 export async function fetchUserProfile(authUid: string): Promise<AuthUser | null> {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('users')
     .select('*')
     .eq('auth_uid', authUid)
-    .single();
+    .maybeSingle();
 
   if (data) {
     const userData = data as unknown as User;
@@ -123,42 +119,39 @@ export async function fetchUserProfile(authUid: string): Promise<AuthUser | null
     const email = authUserData.user.email || '';
     const fullName = authUserData.user.user_metadata?.full_name || 'Admin';
 
-    // Get existing organization or create default one
+    // Check if any org exists, or create a new one with explicit UUID
     let orgId: string;
     const { data: existingOrgs } = await supabase.from('organizations').select('id').limit(1);
     if (existingOrgs && existingOrgs.length > 0) {
       orgId = (existingOrgs[0] as { id: string }).id;
     } else {
-      const { data: newOrg, error: createOrgErr } = await supabase
+      orgId = crypto.randomUUID();
+      const { error: createOrgErr } = await supabase
         .from('organizations')
-        .insert([{ name: 'NortaGiro Org', settings: {} }] as unknown as never[])
-        .select()
-        .single();
-      if (createOrgErr || !newOrg) return null;
-      orgId = (newOrg as { id: string }).id;
+        .insert([{ id: orgId, name: 'NortaGiro Org', settings: {} }] as unknown as never[]);
+      if (createOrgErr) return null;
     }
 
-    // Insert user into public.users
-    const { data: newUser, error: createErr } = await supabase
+    // Insert user into public.users with explicit UUID
+    const userId = crypto.randomUUID();
+    const { error: createErr } = await supabase
       .from('users')
       .insert([{
+        id: userId,
         organization_id: orgId,
         auth_uid: authUid,
         email,
         full_name: fullName,
         role: 'admin',
-      }] as unknown as never[])
-      .select()
-      .single();
+      }] as unknown as never[]);
 
-    if (newUser) {
-      const uData = newUser as unknown as User;
+    if (!createErr) {
       return {
-        id: uData.id,
-        email: uData.email,
-        fullName: uData.full_name,
-        role: uData.role,
-        organizationId: uData.organization_id,
+        id: userId,
+        email,
+        fullName,
+        role: 'admin',
+        organizationId: orgId,
       };
     }
   } catch (err) {
