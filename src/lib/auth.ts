@@ -36,6 +36,7 @@ export async function signUp({ email, password, fullName, organizationName }: Si
     password,
     options: {
       data: { full_name: fullName },
+      emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
     },
   });
 

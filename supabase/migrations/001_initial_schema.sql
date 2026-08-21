@@ -229,6 +229,10 @@ CREATE POLICY "Users can view their own organization"
   ON organizations FOR SELECT
   USING (id = get_user_org_id());
 
+CREATE POLICY "Anyone can create an organization"
+  ON organizations FOR INSERT
+  WITH CHECK (true);
+
 CREATE POLICY "Admins can update their organization"
   ON organizations FOR UPDATE
   USING (id = get_user_org_id() AND get_user_role() = 'admin');
@@ -238,6 +242,10 @@ CREATE POLICY "Admins can update their organization"
 CREATE POLICY "Users can view users in their organization"
   ON users FOR SELECT
   USING (organization_id = get_user_org_id());
+
+CREATE POLICY "Authenticated users can create their profile"
+  ON users FOR INSERT
+  WITH CHECK (auth_uid = auth.uid());
 
 CREATE POLICY "Admins can manage users"
   ON users FOR ALL
