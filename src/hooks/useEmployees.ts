@@ -10,6 +10,41 @@ export interface EmployeeWithSegments extends Employee {
 
 export interface SegmentFieldWithOptions extends SegmentField {}
 
+// ─── Helpers ────────────────────────────────────────────
+
+export function getDepartmentOptions(segmentFields: SegmentFieldWithOptions[]): string[] {
+  const safeFields = Array.isArray(segmentFields) ? segmentFields : [];
+  const field = safeFields.find(f => 
+    f?.field_name && (
+      f.field_name.toLowerCase().includes('departamento') ||
+      f.field_name.toLowerCase().includes('sección') ||
+      f.field_name.toLowerCase().includes('area') ||
+      f.field_name.toLowerCase().includes('equipo')
+    )
+  );
+  if (field && Array.isArray(field.options) && field.options.length > 0) {
+    return field.options;
+  }
+  return ['Tech', 'Sales', 'Ops', 'Marketing', 'RRHH', 'Finance'];
+}
+
+export function getLocationOptions(segmentFields: SegmentFieldWithOptions[]): string[] {
+  const safeFields = Array.isArray(segmentFields) ? segmentFields : [];
+  const field = safeFields.find(f => 
+    f?.field_name && (
+      f.field_name.toLowerCase().includes('ubicación') ||
+      f.field_name.toLowerCase().includes('location') ||
+      f.field_name.toLowerCase().includes('zona') ||
+      f.field_name.toLowerCase().includes('territorio') ||
+      f.field_name.toLowerCase().includes('sede')
+    )
+  );
+  if (field && Array.isArray(field.options) && field.options.length > 0) {
+    return field.options;
+  }
+  return ['Sede Central', 'Madrid', 'Barcelona', 'Remoto', 'Zona Norte'];
+}
+
 // ─── Mock Data ──────────────────────────────────────────
 
 const MOCK_SEGMENT_FIELDS: SegmentFieldWithOptions[] = [

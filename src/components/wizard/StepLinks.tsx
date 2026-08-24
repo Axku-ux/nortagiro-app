@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Copy, CheckCircle2, Link as LinkIcon, Share2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getDepartmentOptions, getLocationOptions } from '../../hooks/useEmployees';
 
 interface StepLinksProps {
   campaignId: string;
-  segmentFields: { id: string; field_name: string; options: string[] }[];
+  segmentFields: any[];
   selectedDepartments?: string[];
   selectedLocations?: string[];
   onFinish: () => void;
@@ -13,8 +14,8 @@ interface StepLinksProps {
 export function StepLinks({ campaignId, segmentFields, selectedDepartments, selectedLocations, onFinish }: StepLinksProps) {
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  const defaultDepts = segmentFields.find(f => f.field_name.toLowerCase().includes('departamento'))?.options || ['Tech', 'Sales', 'Ops', 'Marketing', 'General'];
-  const defaultLocs = segmentFields.find(f => f.field_name.toLowerCase().includes('ubicación') || f.field_name.toLowerCase().includes('location'))?.options || ['Sede Central', 'Madrid', 'Barcelona', 'Remoto'];
+  const defaultDepts = getDepartmentOptions(segmentFields);
+  const defaultLocs = getLocationOptions(segmentFields);
 
   const departments = selectedDepartments && selectedDepartments.length > 0 ? selectedDepartments : defaultDepts;
   const locations = selectedLocations && selectedLocations.length > 0 ? selectedLocations : defaultLocs;

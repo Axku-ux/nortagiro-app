@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useCampaigns } from '../hooks/useCampaigns';
-import { useEmployees } from '../hooks/useEmployees';
+import { useEmployees, getDepartmentOptions, getLocationOptions } from '../hooks/useEmployees';
 import type { QuestionDraft } from '../hooks/useCampaigns';
 import type { ReminderConfig } from '../lib/database.types';
 import { StepConfig } from '../components/wizard/StepConfig';
@@ -40,11 +40,19 @@ export function WizardView({ onBack }: { onBack: () => void }) {
   const [questions, setQuestions] = useState<QuestionDraft[]>(mockQuestions);
 
   // Step 3: Audience Filters
-  const defaultDepts = segmentFields.find(f => f.field_name.toLowerCase().includes('departamento'))?.options || ['Tech', 'Sales', 'Ops', 'Marketing', 'General'];
-  const defaultLocs = segmentFields.find(f => f.field_name.toLowerCase().includes('ubicación') || f.field_name.toLowerCase().includes('location'))?.options || ['Sede Central', 'Madrid', 'Barcelona', 'Remoto'];
+  const currentDepts = getDepartmentOptions(segmentFields);
+  const currentLocs = getLocationOptions(segmentFields);
   
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>(defaultDepts);
-  const [selectedLocations, setSelectedLocations] = useState<string[]>(defaultLocs);
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>(currentDepts);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>(currentLocs);
+
+  // Keep audience selection synced with segmentFields when segmentFields change or load
+  useEffect(() => {
+    const depts = getDepartmentOptions(segmentFields);
+    const locs = getLocationOptions(segmentFields);
+    setSelectedDepartments(depts);
+    setSelectedLocations(locs);
+  }, [segmentFields]);
 
   // Step 4: Schedule + Review
   const [startsAt, setStartsAt] = useState(todayStr);

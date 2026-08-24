@@ -1,8 +1,9 @@
 import React from 'react';
 import { Tag, MapPin, Users, CheckSquare, Square } from 'lucide-react';
+import { getDepartmentOptions, getLocationOptions } from '../../hooks/useEmployees';
 
 interface StepAudienceProps {
-  segmentFields: { id: string; field_name: string; options: string[] }[];
+  segmentFields: any[];
   selectedDepartments: string[];
   selectedLocations: string[];
   onDepartmentsChange: (depts: string[]) => void;
@@ -16,8 +17,8 @@ export function StepAudience({
   onDepartmentsChange,
   onLocationsChange,
 }: StepAudienceProps) {
-  const allDepartments = segmentFields.find(f => f.field_name.toLowerCase().includes('departamento'))?.options || ['Tech', 'Sales', 'Ops', 'Marketing', 'General'];
-  const allLocations = segmentFields.find(f => f.field_name.toLowerCase().includes('ubicación') || f.field_name.toLowerCase().includes('location'))?.options || ['Sede Central', 'Madrid', 'Barcelona', 'Remoto'];
+  const allDepartments = getDepartmentOptions(segmentFields);
+  const allLocations = getLocationOptions(segmentFields);
 
   const toggleDept = (dept: string) => {
     if (selectedDepartments.includes(dept)) {
