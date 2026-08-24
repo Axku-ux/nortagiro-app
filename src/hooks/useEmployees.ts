@@ -165,6 +165,32 @@ export function useEmployees() {
     }
   }, [segmentFields, updateOptionsInField]);
 
+  const addSegmentField = useCallback(async (fieldName: string, options: string[]) => {
+    try {
+      const { error } = await supabase
+        .from('segment_fields')
+        .insert([{
+          field_name: fieldName,
+          field_type: 'select',
+          options,
+          organization_id: 'current-org',
+        }] as unknown as never[]);
+
+      if (error) throw error;
+      await fetchSegmentFields();
+    } catch {
+      const newField: SegmentFieldWithOptions = {
+        id: `sf-${Date.now()}`,
+        organization_id: 'mock-org',
+        field_name: fieldName,
+        field_type: 'select',
+        options,
+        created_at: new Date().toISOString(),
+      };
+      setSegmentFields((prev) => [...prev, newField]);
+    }
+  }, [fetchSegmentFields]);
+
   const removeOptionFromField = useCallback(async (fieldName: string, option: string) => {
     const field = segmentFields.find(f => f?.field_name && f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
     const currentOptions = field?.options || [];
