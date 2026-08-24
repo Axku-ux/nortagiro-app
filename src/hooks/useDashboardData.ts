@@ -69,6 +69,7 @@ export function useDashboardData(campaignId?: string) {
           rating,
           department,
           location,
+          question_id,
           questions ( dimension )
         `)
         .eq('campaign_id', targetId);
@@ -136,6 +137,10 @@ export function useDashboardData(campaignId?: string) {
       const pctDetractors = Math.round((detractors / totalResponses) * 100);
       const enps = pctPromoters - pctDetractors;
 
+      // Calculate participation count (total responses divided by number of unique questions)
+      const uniqueQuestionIds = new Set(responses.map((r: any) => r.question_id));
+      const participationCount = uniqueQuestionIds.size > 0 ? Math.round(totalResponses / uniqueQuestionIds.size) : 0;
+
       // Calculate Burnout Risk: percentage of responses in "Bienestar" that are <= 5
       let wellbeingResponses = 0;
       let burnoutSignals = 0;
@@ -154,7 +159,7 @@ export function useDashboardData(campaignId?: string) {
         enpsPromoters: pctPromoters,
         enpsNeutral: pctNeutrals,
         enpsDetractors: pctDetractors,
-        participationCount: totalResponses,
+        participationCount,
         participationDelta: 0,
         burnoutRisk,
         burnoutDelta: 0,
