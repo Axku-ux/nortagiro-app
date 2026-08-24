@@ -66,11 +66,31 @@ const MOCK_EMPLOYEES: EmployeeWithSegments[] = [
   { id: 'emp-10', organization_id: 'mock-org', email: 'miguel.diaz@acme.com', full_name: 'Miguel Díaz', is_active: true, invite_token: 'tok-10', created_at: '', segments: { Departamento: 'Finance', Ubicación: 'Madrid', Antigüedad: '1-3 años' } },
 ];
 
+function getInitialEmployees(): EmployeeWithSegments[] {
+  try {
+    const saved = localStorage.getItem('mock_employees');
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.warn('Failed to parse mock_employees from localStorage');
+  }
+  return MOCK_EMPLOYEES;
+}
+
+function getInitialSegmentFields(): SegmentFieldWithOptions[] {
+  try {
+    const saved = localStorage.getItem('mock_segment_fields');
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.warn('Failed to parse mock_segment_fields from localStorage');
+  }
+  return MOCK_SEGMENT_FIELDS;
+}
+
 // ─── Hook ───────────────────────────────────────────────
 
 export function useEmployees() {
-  const [employees, setEmployees] = useState<EmployeeWithSegments[]>(MOCK_EMPLOYEES);
-  const [segmentFields, setSegmentFields] = useState<SegmentFieldWithOptions[]>(MOCK_SEGMENT_FIELDS);
+  const [employees, setEmployees] = useState<EmployeeWithSegments[]>(getInitialEmployees);
+  const [segmentFields, setSegmentFields] = useState<SegmentFieldWithOptions[]>(getInitialSegmentFields);
   const [loading, setLoading] = useState(false);
 
   const fetchEmployees = useCallback(async () => {
@@ -145,9 +165,11 @@ export function useEmployees() {
         created_at: new Date().toISOString(),
         segments: employee.segments,
       };
-      setEmployees((prev) => [...prev, newEmp]);
+      const newEmployees = [...employees, newEmp];
+      setEmployees(newEmployees);
+      localStorage.setItem('mock_employees', JSON.stringify(newEmployees));
     }
-  }, [fetchEmployees]);
+  }, [fetchEmployees, employees]);
 
   const toggleEmployeeActive = useCallback(async (id: string) => {
     const emp = employees.find((e) => e.id === id);
@@ -162,9 +184,9 @@ export function useEmployees() {
       if (error) throw error;
       await fetchEmployees();
     } catch {
-      setEmployees((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, is_active: !e.is_active } : e))
-      );
+      const newEmployees = employees.map((e) => (e.id === id ? { ...e, is_active: !e.is_active } : e));
+      setEmployees(newEmployees);
+      localStorage.setItem('mock_employees', JSON.stringify(newEmployees));
     }
   }, [employees, fetchEmployees]);
 
@@ -184,12 +206,14 @@ export function useEmployees() {
       console.warn("Updating segment field in memory:", e);
     }
 
-    setSegmentFields(prev => prev.map(f => {
+    const newSegmentFields = segmentFields.map(f => {
       if (f?.field_name && f.field_name.toLowerCase().includes(fieldName.toLowerCase())) {
         return { ...f, options: newOptions };
       }
       return f;
-    }));
+    });
+    setSegmentFields(newSegmentFields);
+    localStorage.setItem('mock_segment_fields', JSON.stringify(newSegmentFields));
   }, [segmentFields, fetchSegmentFields]);
 
   const addOptionToField = useCallback(async (fieldName: string, option: string) => {
@@ -222,9 +246,11 @@ export function useEmployees() {
         options,
         created_at: new Date().toISOString(),
       };
-      setSegmentFields((prev) => [...prev, newField]);
+      const newFields = [...segmentFields, newField];
+      setSegmentFields(newFields);
+      localStorage.setItem('mock_segment_fields', JSON.stringify(newFields));
     }
-  }, [fetchSegmentFields]);
+  }, [fetchSegmentFields, segmentFields]);
 
   const removeOptionFromField = useCallback(async (fieldName: string, option: string) => {
     const field = segmentFields.find(f => f?.field_name && f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
