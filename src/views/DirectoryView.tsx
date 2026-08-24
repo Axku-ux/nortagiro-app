@@ -26,7 +26,7 @@ export function DirectoryView() {
     field_name: 'Departamento',
     options: Array.isArray(rawDeptField?.options) && rawDeptField.options.length > 0
       ? rawDeptField.options 
-      : ['Tech', 'Sales', 'Ops', 'Marketing', 'RRHH', 'Finance'],
+      : [],
   };
 
   const rawLocField = safeSegmentFields.find(f => 
@@ -41,7 +41,7 @@ export function DirectoryView() {
     field_name: 'Ubicación / Territorio',
     options: Array.isArray(rawLocField?.options) && rawLocField.options.length > 0
       ? rawLocField.options 
-      : ['Sede Central', 'Madrid', 'Barcelona', 'Remoto', 'Zona Norte'],
+      : [],
   };
 
   // State for new department/territory input
