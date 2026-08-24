@@ -34,12 +34,11 @@ const MOCK_EMPLOYEES: EmployeeWithSegments[] = [
 // ─── Hook ───────────────────────────────────────────────
 
 export function useEmployees() {
-  const [employees, setEmployees] = useState<EmployeeWithSegments[]>([]);
-  const [segmentFields, setSegmentFields] = useState<SegmentFieldWithOptions[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [employees, setEmployees] = useState<EmployeeWithSegments[]>(MOCK_EMPLOYEES);
+  const [segmentFields, setSegmentFields] = useState<SegmentFieldWithOptions[]>(MOCK_SEGMENT_FIELDS);
+  const [loading, setLoading] = useState(false);
 
   const fetchEmployees = useCallback(async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('employees')
@@ -54,13 +53,9 @@ export function useEmployees() {
           segments: {},
         }));
         setEmployees(mapped);
-      } else {
-        setEmployees(MOCK_EMPLOYEES);
       }
     } catch {
-      setEmployees(MOCK_EMPLOYEES);
-    } finally {
-      setLoading(false);
+      // Keep mock
     }
   }, []);
 
@@ -74,12 +69,14 @@ export function useEmployees() {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setSegmentFields(data as unknown as SegmentFieldWithOptions[]);
-      } else {
-        setSegmentFields(MOCK_SEGMENT_FIELDS);
+        const validFields = (data as unknown as SegmentFieldWithOptions[]).map(f => ({
+          ...f,
+          options: Array.isArray(f.options) ? f.options : []
+        }));
+        setSegmentFields(validFields);
       }
     } catch {
-      setSegmentFields(MOCK_SEGMENT_FIELDS);
+      // Keep mock
     }
   }, []);
 

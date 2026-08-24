@@ -18,20 +18,30 @@ import { cn } from '../lib/utils';
 export function DirectoryView() {
   const { segmentFields, addOptionToField, removeOptionFromField, updateOptionsInField } = useEmployees();
 
-  // Find department & location fields
-  const deptField = segmentFields.find(f => f.field_name.toLowerCase().includes('departamento')) || {
+  // Find department & location fields safely
+  const safeSegmentFields = Array.isArray(segmentFields) ? segmentFields : [];
+
+  const rawDeptField = safeSegmentFields.find(f => f?.field_name && f.field_name.toLowerCase().includes('departamento'));
+  const deptField = {
     field_name: 'Departamento',
-    options: ['Tech', 'Sales', 'Ops', 'Marketing', 'RRHH', 'Finance'],
+    options: Array.isArray(rawDeptField?.options) && rawDeptField.options.length > 0
+      ? rawDeptField.options 
+      : ['Tech', 'Sales', 'Ops', 'Marketing', 'RRHH', 'Finance'],
   };
 
-  const locField = segmentFields.find(f => 
-    f.field_name.toLowerCase().includes('ubicación') || 
-    f.field_name.toLowerCase().includes('location') ||
-    f.field_name.toLowerCase().includes('zona') ||
-    f.field_name.toLowerCase().includes('territorio')
-  ) || {
+  const rawLocField = safeSegmentFields.find(f => 
+    f?.field_name && (
+      f.field_name.toLowerCase().includes('ubicación') || 
+      f.field_name.toLowerCase().includes('location') ||
+      f.field_name.toLowerCase().includes('zona') ||
+      f.field_name.toLowerCase().includes('territorio')
+    )
+  );
+  const locField = {
     field_name: 'Ubicación / Territorio',
-    options: ['Sede Central', 'Madrid', 'Barcelona', 'Remoto', 'Zona Norte'],
+    options: Array.isArray(rawLocField?.options) && rawLocField.options.length > 0
+      ? rawLocField.options 
+      : ['Sede Central', 'Madrid', 'Barcelona', 'Remoto', 'Zona Norte'],
   };
 
   // State for new department/territory input

@@ -41,8 +41,12 @@ export function CampaignsView({ onCreateNew, onEdit }: CampaignsViewProps) {
   const [linksModalCampaign, setLinksModalCampaign] = useState<{ id: string; title: string } | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const departments = segmentFields.find(f => f.field_name.toLowerCase().includes('departamento'))?.options || ['Tech', 'Sales', 'Ops', 'Marketing', 'General'];
-  const locations = segmentFields.find(f => f.field_name.toLowerCase().includes('ubicación') || f.field_name.toLowerCase().includes('location'))?.options || ['Sede Central', 'Madrid', 'Barcelona', 'Remoto'];
+  const safeSegmentFields = Array.isArray(segmentFields) ? segmentFields : [];
+  const rawDepts = safeSegmentFields.find(f => f?.field_name && f.field_name.toLowerCase().includes('departamento'))?.options;
+  const rawLocs = safeSegmentFields.find(f => f?.field_name && (f.field_name.toLowerCase().includes('ubicación') || f.field_name.toLowerCase().includes('location')))?.options;
+
+  const departments = Array.isArray(rawDepts) && rawDepts.length > 0 ? rawDepts : ['Tech', 'Sales', 'Ops', 'Marketing', 'General'];
+  const locations = Array.isArray(rawLocs) && rawLocs.length > 0 ? rawLocs : ['Sede Central', 'Madrid', 'Barcelona', 'Remoto'];
 
   const combinations = departments.flatMap(dept => locations.map(loc => ({ dept, loc })));
 
