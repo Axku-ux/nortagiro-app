@@ -5,7 +5,9 @@ import { HelpCircle } from 'lucide-react';
 
 interface HeatmapProps {
   data: HeatmapData[];
-  departments: string[];
+  columns: string[];
+  title: string;
+  subtitle: string;
 }
 
 // Semáforo colors based on thresholds
@@ -15,15 +17,15 @@ const getScoreColor = (score: number) => {
   return 'bg-rose-100 text-rose-800 border-rose-200';
 };
 
-export function Heatmap({ data, departments }: HeatmapProps) {
+export function Heatmap({ data, columns, title, subtitle }: HeatmapProps) {
   if (!data || data.length === 0) return null;
 
   return (
     <div className="card overflow-hidden">
       <div className="p-5 border-b border-outline-variant/50 flex items-center justify-between bg-surface-container-lowest">
         <div>
-          <h3 className="text-lg font-bold text-on-background tracking-tight">Mapa de Calor por Área</h3>
-          <p className="text-sm text-secondary mt-0.5">Puntuaciones agregadas por dimensión y departamento.</p>
+          <h3 className="text-lg font-bold text-on-background tracking-tight">{title}</h3>
+          <p className="text-sm text-secondary mt-0.5">{subtitle}</p>
         </div>
         
         {/* Legend */}
@@ -47,9 +49,9 @@ export function Heatmap({ data, departments }: HeatmapProps) {
               <th className="px-5 py-4 text-xs font-bold text-secondary uppercase tracking-wider bg-surface-container-lowest border-b border-outline-variant/50 w-48">
                 Dimensión
               </th>
-              {departments.map((dept) => (
-                <th key={dept} className="px-3 py-4 text-xs font-bold text-secondary uppercase tracking-wider bg-surface-container-lowest border-b border-outline-variant/50 text-center min-w-[100px]">
-                  {dept}
+              {columns.map((col) => (
+                <th key={col} className="px-3 py-4 text-xs font-bold text-secondary uppercase tracking-wider bg-surface-container-lowest border-b border-outline-variant/50 text-center min-w-[100px]">
+                  {col}
                 </th>
               ))}
             </tr>
@@ -68,12 +70,12 @@ export function Heatmap({ data, departments }: HeatmapProps) {
                       {avg}
                     </div>
                   </td>
-                  {departments.map((dept) => {
-                    const score = row.scores[dept];
+                  {columns.map((col) => {
+                    const score = row.scores[col];
                     const displayScore = score !== undefined ? score.toFixed(1) : '-';
                     
                     return (
-                      <td key={dept} className="p-2 text-center">
+                      <td key={col} className="p-2 text-center">
                         {score !== undefined ? (
                           <div className={cn(
                             "mx-auto w-12 h-10 flex items-center justify-center rounded-lg text-sm font-bold border transition-transform duration-200 group-hover:scale-105",

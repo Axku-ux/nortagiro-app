@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { useCampaigns } from '../hooks/useCampaigns';
 import { Heatmap } from '../components/dashboard/Heatmap';
 import { 
   TrendingUp, 
@@ -7,16 +8,18 @@ import {
   Users, 
   Activity, 
   AlertTriangle,
-  Lightbulb,
-  Award,
-  Filter,
   RefreshCw,
   Loader2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function DashboardView() {
-  const { data, loading, refetch } = useDashboardData();
+  const { campaigns } = useCampaigns();
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
+
+  // If 'all' is selected but we don't support 'all' easily in useDashboardData without backend changes,
+  // we can just pass undefined to get the latest campaign, or we can use the selected one.
+  const { data, loading, refetch } = useDashboardData(selectedCampaign === 'all' ? undefined : selectedCampaign);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -50,7 +53,7 @@ export function DashboardView() {
     );
   }
 
-  const { metrics, heatmap, departments, insights } = data;
+  const { metrics, heatmap, departments, heatmapLocation, locations } = data;
 
   const kpiCards = [
     {
@@ -70,7 +73,8 @@ export function DashboardView() {
     },
     {
       title: 'Participación',
-      value: `${metrics.participationRate}%`,
+      value: metrics.participationCount.toString(),
+      suffix: ' resp.',
       delta: metrics.participationDelta,
       icon: TrendingUp,
       color: 'indigo'
@@ -86,7 +90,7 @@ export function DashboardView() {
   ];
 
   return (
-    <div className="p-4 md:p-8 space-y-8 w-full max-w-[1440px] mx-auto animate-in fade-in duration-500">
+    <div className="p-4 md:p-8 space-y-8 w-full max-w-[1440px] mx-auto animate-in fade-in duration-500 pb-20">
       {/* Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
@@ -94,9 +98,15 @@ export function DashboardView() {
           <p className="text-lg text-on-surface-variant mt-1">Resumen ejecutivo y pulso organizacional.</p>
         </div>
         <div className="flex items-center gap-3">
-          <select className="bg-surface border border-outline-variant rounded-xl px-4 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-variant transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-primary-fixed-dim">
-            <option>Q3 2024 (Jul - Sep)</option>
-            <option>Q2 2024 (Abr - Jun)</option>
+          <select 
+            value={selectedCampaign}
+            onChange={(e) => setSelectedCampaign(e.target.value)}
+            className="bg-surface border border-outline-variant rounded-xl px-4 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-variant transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-primary-fixed-dim"
+          >
+            {campaigns.length === 0 && <option value="all">Sin Campañas</option>}
+            {campaigns.map(c => (
+              <option key={c.id} value={c.id}>{c.title}</option>
+            ))}
           </select>
           <button 
             onClick={handleRefresh}
@@ -148,7 +158,7 @@ export function DashboardView() {
                     isGoodDelta ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
                   )}>
                     {kpi.delta! > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                    {Math.abs(kpi.delta!)}{kpi.title === 'Participación' || kpi.title === 'Riesgo Burnout' ? '%' : ''} vs Q anterior
+                    {Math.abs(kpi.delta!)}{kpi.title === 'Riesgo Burnout' ? '%' : ''} vs Q anterior
                   </div>
                 ) : null}
               </div>
@@ -157,96 +167,22 @@ export function DashboardView() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Heatmap Area (Span 2) */}
-        <div className="xl:col-span-2 space-y-6">
-          <Heatmap data={heatmap} departments={departments} />
-          
-          {/* Sentiment / Topics (Placeholder visually consistent) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="card p-6">
-              <h3 className="text-sm font-bold text-on-background uppercase tracking-wider mb-6">Análisis de Sentimiento</h3>
-              <div className="space-y-4">
-                {['Liderazgo', 'Crecimiento', 'Bienestar'].map((dim, i) => (
-                  <div key={dim} className="space-y-2">
-                    <div className="flex justify-between text-sm font-medium">
-                      <span>{dim}</span>
-                    </div>
-                    <div className="h-2.5 rounded-full overflow-hidden flex bg-surface-variant">
-                      <div style={{ width: `${60 - i * 10}%` }} className="bg-emerald-500" />
-                      <div style={{ width: `${30 + i * 5}%` }} className="bg-amber-400" />
-                      <div style={{ width: `${10 + i * 5}%` }} className="bg-rose-500" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="card p-6">
-              <h3 className="text-sm font-bold text-on-background uppercase tracking-wider mb-6">Temas Mencionados</h3>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-sm font-medium">Carga de trabajo (42)</span>
-                <span className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm font-medium">Horario flexible (38)</span>
-                <span className="px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm font-medium">Comunicación (25)</span>
-                <span className="px-3 py-1.5 bg-surface-variant text-secondary rounded-lg text-sm font-medium">Onboarding (14)</span>
-                <span className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm font-medium">Eventos team (12)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* AI Insights Area (Span 1) */}
-        <div className="xl:col-span-1">
-          <div className="card h-full bg-gradient-to-b from-slate-900 to-slate-800 text-white border-slate-700 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-blue-500" />
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-            
-            <div className="p-6 border-b border-slate-700/50 flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-xl flex items-center justify-center shadow-inner">
-                  <Lightbulb className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold tracking-tight text-white">AI Insights</h3>
-                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-0.5">Generado por Gemini</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-6 relative z-10">
-              {insights.map((insight) => {
-                const isAlert = insight.type === 'alert';
-                const isPraise = insight.type === 'praise';
-                const Icon = isAlert ? AlertTriangle : isPraise ? Award : TrendingUp;
-                
-                return (
-                  <div key={insight.id} className="group cursor-default">
-                    <div className="flex items-start gap-3 mb-2">
-                      <div className={cn(
-                        "mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-                        isAlert ? "bg-rose-500/20 text-rose-400" : isPraise ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400"
-                      )}>
-                        <Icon className="w-3.5 h-3.5" />
-                      </div>
-                      <h4 className="font-semibold text-sm leading-tight text-slate-200 group-hover:text-white transition-colors">
-                        {insight.title}
-                      </h4>
-                    </div>
-                    <p className="text-sm text-slate-400 leading-relaxed pl-9">
-                      {insight.description}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-            
-            <div className="absolute bottom-0 left-0 w-full p-6 pt-0 text-center">
-              <button className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 mx-auto">
-                <Filter className="w-3.5 h-3.5" />
-                Explorar todos los insights
-              </button>
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-6">
+        {/* Heatmap Departamentos */}
+        <Heatmap 
+          data={heatmap} 
+          columns={departments} 
+          title="Mapa de Calor por Área"
+          subtitle="Puntuaciones agregadas por dimensión y departamento."
+        />
+        
+        {/* Heatmap Ubicaciones */}
+        <Heatmap 
+          data={heatmapLocation} 
+          columns={locations} 
+          title="Mapa de Calor por Ubicación"
+          subtitle="Mejores y peores sucursales (Top 3 y Bottom 3)."
+        />
       </div>
     </div>
   );
