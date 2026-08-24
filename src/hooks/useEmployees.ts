@@ -135,7 +135,7 @@ export function useEmployees() {
 
   const updateOptionsInField = useCallback(async (fieldName: string, newOptions: string[]) => {
     try {
-      const field = segmentFields.find(f => f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
+      const field = segmentFields.find(f => f?.field_name && f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
       if (field && field.id && !field.id.startsWith('sf-')) {
         const { error } = await supabase
           .from('segment_fields')
@@ -150,7 +150,7 @@ export function useEmployees() {
     }
 
     setSegmentFields(prev => prev.map(f => {
-      if (f.field_name.toLowerCase().includes(fieldName.toLowerCase())) {
+      if (f?.field_name && f.field_name.toLowerCase().includes(fieldName.toLowerCase())) {
         return { ...f, options: newOptions };
       }
       return f;
@@ -158,7 +158,7 @@ export function useEmployees() {
   }, [segmentFields, fetchSegmentFields]);
 
   const addOptionToField = useCallback(async (fieldName: string, option: string) => {
-    const field = segmentFields.find(f => f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
+    const field = segmentFields.find(f => f?.field_name && f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
     const currentOptions = field?.options || [];
     if (!currentOptions.includes(option)) {
       await updateOptionsInField(fieldName, [...currentOptions, option]);
@@ -166,7 +166,7 @@ export function useEmployees() {
   }, [segmentFields, updateOptionsInField]);
 
   const removeOptionFromField = useCallback(async (fieldName: string, option: string) => {
-    const field = segmentFields.find(f => f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
+    const field = segmentFields.find(f => f?.field_name && f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
     const currentOptions = field?.options || [];
     await updateOptionsInField(fieldName, currentOptions.filter(o => o !== option));
   }, [segmentFields, updateOptionsInField]);

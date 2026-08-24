@@ -56,6 +56,48 @@ function AuthGate() {
   return <AppShell user={user} onSignOut={handleSignOut} />;
 }
 
+// ─── Error Boundary ──────────────────────────────────────
+
+class ViewErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("View rendering error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center max-w-md mx-auto my-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
+          <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-600 font-bold">
+            !
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-2">Ha ocurrido un problema al cargar la vista</h3>
+          <p className="text-xs text-slate-500 mb-6">{this.state.error?.message || 'Error inesperado'}</p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.href = '/';
+            }}
+            className="bg-primary text-white text-xs font-bold px-4 py-2 rounded-xl"
+          >
+            Volver al Inicio
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // ─── Main App Shell (authenticated) ────────────────────
 
 interface AppShellProps {
@@ -64,8 +106,38 @@ interface AppShellProps {
 }
 
 function AppShell({ user, onSignOut }: AppShellProps) {
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  // Read initial view from URL path (e.g., /campaigns -> campaigns, /directory -> directory)
+  const getInitialView = (): View => {
+    const path = window.location.pathname.replace('/', '').toLowerCase();
+    if (['dashboard', 'wizard', 'survey', 'campaigns', 'reporting', 'settings', 'directory', 'insights'].includes(path)) {
+      return path as View;
+    }
+    return 'dashboard';
+  };
+
+  const [currentView, setCurrentViewRaw] = useState<View>(getInitialView);
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+
+  const setCurrentView = (v: View) => {
+    setCurrentViewRaw(v);
+    try {
+      const targetPath = v === 'dashboard' ? '/' : `/${v}`;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({}, '', targetPath);
+      }
+    } catch {
+      // Ignore history API errors
+    }
+  };
+
+  // Handle browser back/forward buttons
+  React.useEffect(() => {
+    const handlePopState = () => {
+      setCurrentViewRaw(getInitialView());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Survey view renders full-screen (no sidebar)
   if (currentView === 'survey') {
@@ -77,31 +149,33 @@ function AppShell({ user, onSignOut }: AppShellProps) {
       <Sidebar
         currentView={currentView}
         onViewChange={(v) => setCurrentView(v as View)}
-        userName={user.fullName}
-        userRole={user.role}
-        userEmail={user.email}
+        userName={user.fullName || 'Usuario'}
+        userRole={user.role || 'admin'}
+        userEmail={user.email || ''}
         onSignOut={onSignOut}
       />
       
       <main className="flex-1 flex flex-col min-w-0 h-screen relative">
         <TopNav />
         <div className="flex-1 overflow-y-auto pb-24 md:pb-0 relative bg-surface-bright">
-          {currentView === 'dashboard' && <DashboardView />}
-          {currentView === 'campaigns' && (
-            <CampaignsView 
-              onCreateNew={() => setCurrentView('wizard')}
-              onEdit={(id) => {
-                setEditingCampaignId(id);
-                setCurrentView('wizard');
-              }}
-            />
-          )}
-          {currentView === 'wizard' && (
-            <WizardView onBack={() => setCurrentView('campaigns')} />
-          )}
-          {currentView === 'reporting' && <ReportingView />}
-          {currentView === 'insights' && <InsightsView />}
-          {currentView === 'directory' && <DirectoryView />}
+          <ViewErrorBoundary>
+            {currentView === 'dashboard' && <DashboardView />}
+            {currentView === 'campaigns' && (
+              <CampaignsView 
+                onCreateNew={() => setCurrentView('wizard')}
+                onEdit={(id) => {
+                  setEditingCampaignId(id);
+                  setCurrentView('wizard');
+                }}
+              />
+            )}
+            {currentView === 'wizard' && (
+              <WizardView onBack={() => setCurrentView('campaigns')} />
+            )}
+            {currentView === 'reporting' && <ReportingView />}
+            {currentView === 'insights' && <InsightsView />}
+            {currentView === 'directory' && <DirectoryView />}
+          </ViewErrorBoundary>
         </div>
 
         {/* Mobile Bottom Nav */}

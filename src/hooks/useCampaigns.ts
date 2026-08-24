@@ -110,7 +110,10 @@ export function useCampaigns() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchCampaigns = useCallback(async () => {
-    if (!user) return; // Don't fetch if not logged in
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     setError(null);
@@ -134,8 +137,8 @@ export function useCampaigns() {
         }));
         setCampaigns(mapped);
       } else {
-        // Empty state
-        setCampaigns([]);
+        // Empty state - show mock or empty list safely
+        setCampaigns(MOCK_CAMPAIGNS);
       }
     } catch {
       // Fallback to mock data only if DB fails entirely
