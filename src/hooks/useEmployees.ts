@@ -136,31 +136,43 @@ export function useEmployees() {
     }
   }, [employees, fetchEmployees]);
 
-  const addSegmentField = useCallback(async (fieldName: string, options: string[]) => {
+  const updateOptionsInField = useCallback(async (fieldName: string, newOptions: string[]) => {
     try {
-      const { error } = await supabase
-        .from('segment_fields')
-        .insert([{
-          field_name: fieldName,
-          field_type: 'select',
-          options,
-          organization_id: 'current-org',
-        }] as unknown as never[]);
-
-      if (error) throw error;
-      await fetchSegmentFields();
-    } catch {
-      const newField: SegmentFieldWithOptions = {
-        id: `sf-${Date.now()}`,
-        organization_id: 'mock-org',
-        field_name: fieldName,
-        field_type: 'select',
-        options,
-        created_at: new Date().toISOString(),
-      };
-      setSegmentFields((prev) => [...prev, newField]);
+      const field = segmentFields.find(f => f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
+      if (field && field.id && !field.id.startsWith('sf-')) {
+        const { error } = await supabase
+          .from('segment_fields')
+          .update({ options: newOptions } as unknown as never)
+          .eq('id', field.id);
+        if (error) throw error;
+        await fetchSegmentFields();
+        return;
+      }
+    } catch (e) {
+      console.warn("Updating segment field in memory:", e);
     }
-  }, [fetchSegmentFields]);
+
+    setSegmentFields(prev => prev.map(f => {
+      if (f.field_name.toLowerCase().includes(fieldName.toLowerCase())) {
+        return { ...f, options: newOptions };
+      }
+      return f;
+    }));
+  }, [segmentFields, fetchSegmentFields]);
+
+  const addOptionToField = useCallback(async (fieldName: string, option: string) => {
+    const field = segmentFields.find(f => f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
+    const currentOptions = field?.options || [];
+    if (!currentOptions.includes(option)) {
+      await updateOptionsInField(fieldName, [...currentOptions, option]);
+    }
+  }, [segmentFields, updateOptionsInField]);
+
+  const removeOptionFromField = useCallback(async (fieldName: string, option: string) => {
+    const field = segmentFields.find(f => f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
+    const currentOptions = field?.options || [];
+    await updateOptionsInField(fieldName, currentOptions.filter(o => o !== option));
+  }, [segmentFields, updateOptionsInField]);
 
   return {
     employees,
@@ -170,6 +182,9 @@ export function useEmployees() {
     addEmployee,
     toggleEmployeeActive,
     addSegmentField,
+    updateOptionsInField,
+    addOptionToField,
+    removeOptionFromField,
     activeEmployees: employees.filter((e) => e.is_active),
   };
 }

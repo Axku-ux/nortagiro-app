@@ -1,203 +1,349 @@
 import React, { useState } from 'react';
 import { useEmployees } from '../hooks/useEmployees';
 import { 
-  Users, 
-  Search, 
+  Building2, 
+  MapPin, 
   Plus, 
-  MoreVertical, 
-  Filter,
-  CheckCircle2,
-  XCircle,
-  Mail,
-  Tag
+  Trash2, 
+  Edit2, 
+  Check, 
+  X, 
+  Tag, 
+  Layers, 
+  Info,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function DirectoryView() {
-  const { employees, segmentFields, loading, toggleEmployeeActive } = useEmployees();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const { segmentFields, addOptionToField, removeOptionFromField, updateOptionsInField } = useEmployees();
 
-  const filtered = employees.filter((emp) => {
-    const matchesSearch = 
-      emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = 
-      statusFilter === 'all' ? true : 
-      statusFilter === 'active' ? emp.is_active : !emp.is_active;
+  // Find department & location fields
+  const deptField = segmentFields.find(f => f.field_name.toLowerCase().includes('departamento')) || {
+    field_name: 'Departamento',
+    options: ['Tech', 'Sales', 'Ops', 'Marketing', 'RRHH', 'Finance'],
+  };
 
-    return matchesSearch && matchesStatus;
-  });
+  const locField = segmentFields.find(f => 
+    f.field_name.toLowerCase().includes('ubicación') || 
+    f.field_name.toLowerCase().includes('location') ||
+    f.field_name.toLowerCase().includes('zona') ||
+    f.field_name.toLowerCase().includes('territorio')
+  ) || {
+    field_name: 'Ubicación / Territorio',
+    options: ['Sede Central', 'Madrid', 'Barcelona', 'Remoto', 'Zona Norte'],
+  };
+
+  // State for new department/territory input
+  const [newDeptInput, setNewDeptInput] = useState('');
+  const [newLocInput, setNewLocInput] = useState('');
+
+  // Editing states
+  const [editingDeptIndex, setEditingDeptIndex] = useState<number | null>(null);
+  const [editingDeptValue, setEditingDeptValue] = useState('');
+
+  const [editingLocIndex, setEditingLocIndex] = useState<number | null>(null);
+  const [editingLocValue, setEditingLocValue] = useState('');
+
+  // Handlers for Department
+  const handleAddDept = () => {
+    if (!newDeptInput.trim()) return;
+    addOptionToField('departamento', newDeptInput.trim());
+    setNewDeptInput('');
+  };
+
+  const handleRemoveDept = (deptName: string) => {
+    if (deptField.options.length <= 1) return;
+    removeOptionFromField('departamento', deptName);
+  };
+
+  const handleSaveEditDept = (index: number) => {
+    if (!editingDeptValue.trim()) return;
+    const updated = [...deptField.options];
+    updated[index] = editingDeptValue.trim();
+    updateOptionsInField('departamento', updated);
+    setEditingDeptIndex(null);
+  };
+
+  // Handlers for Location / Territory
+  const handleAddLoc = () => {
+    if (!newLocInput.trim()) return;
+    addOptionToField('ubicación', newLocInput.trim());
+    setNewLocInput('');
+  };
+
+  const handleRemoveLoc = (locName: string) => {
+    if (locField.options.length <= 1) return;
+    removeOptionFromField('ubicación', locName);
+  };
+
+  const handleSaveEditLoc = (index: number) => {
+    if (!editingLocValue.trim()) return;
+    const updated = [...locField.options];
+    updated[index] = editingLocValue.trim();
+    updateOptionsInField('ubicación', updated);
+    setEditingLocIndex(null);
+  };
+
+  const totalCombinations = deptField.options.length * locField.options.length;
 
   return (
-    <div className="p-4 md:p-8 space-y-8 w-full max-w-[1440px] mx-auto animate-in fade-in duration-500">
+    <div className="p-4 md:p-8 space-y-8 w-full max-w-[1440px] mx-auto animate-in fade-in duration-500 pb-32">
       {/* Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h2 className="text-3xl md:text-4xl font-bold text-on-background tracking-tight">Directorio</h2>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5" />
+              Estructura de la Organización
+            </span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold text-on-background tracking-tight">Departamentos y Zonas</h2>
           <p className="text-lg text-on-surface-variant mt-1">
-            Gestiona los empleados y sus segmentos para las encuestas.
+            Gestiona los segmentos organizativos para personalizar los enlaces anónimos de tus encuestas.
           </p>
-        </div>
-        <div className="flex gap-3">
-          <button className="bg-surface text-on-surface border border-outline-variant font-medium px-5 py-2.5 rounded-xl hover:bg-surface-variant transition-all flex items-center gap-2 text-sm shadow-sm">
-            <Tag className="w-4 h-4" />
-            Gestionar Segmentos
-          </button>
-          <button className="bg-primary text-on-primary font-medium px-5 py-2.5 rounded-xl hover:bg-primary-container transition-all flex items-center gap-2 text-sm shadow-sm">
-            <Plus className="w-4 h-4" />
-            Añadir Empleado
-          </button>
         </div>
       </header>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card p-6 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-on-background">{employees.length}</p>
-            <p className="text-sm text-secondary font-medium uppercase tracking-wider">Total Empleados</p>
-          </div>
+      {/* Info Banner */}
+      <div className="card p-6 bg-emerald-50/50 border-emerald-200 flex items-start gap-4">
+        <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+          <Info className="w-5 h-5 text-emerald-600" />
         </div>
-        <div className="card p-6 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-on-background">{employees.filter(e => e.is_active).length}</p>
-            <p className="text-sm text-secondary font-medium uppercase tracking-wider">Activos (Elegibles)</p>
-          </div>
-        </div>
-        <div className="card p-6 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-            <Tag className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-on-background">{segmentFields.length}</p>
-            <p className="text-sm text-secondary font-medium uppercase tracking-wider">Campos de Segmento</p>
-          </div>
+        <div>
+          <h3 className="text-base font-bold text-emerald-950 mb-1">Distribución Anónima por Grupos</h3>
+          <p className="text-sm text-emerald-800 leading-relaxed">
+            No necesitas dar de alta empleados de forma individual. Cada departamento y territorio que configures aquí generará automáticamente un enlace único de encuesta en el Wizard de creación de campañas.
+          </p>
+          <p className="text-xs font-semibold text-emerald-700 mt-2">
+            Combinaciones actuales: <span className="font-bold">{deptField.options.length}</span> departamentos × <span className="font-bold">{locField.options.length}</span> zonas = <span className="font-extrabold underline">{totalCombinations} enlaces posibles</span>.
+          </p>
         </div>
       </div>
 
-      {/* Filters & Table */}
-      <div className="card overflow-hidden">
-        <div className="p-4 border-b border-outline-variant/50 flex flex-col md:flex-row gap-4 items-center justify-between bg-surface-container-lowest">
-          <div className="relative w-full md:w-96">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre o email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-10 pr-4 py-2 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-fixed-dim transition-all"
-            />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Department Card */}
+        <div className="card p-6 flex flex-col justify-between space-y-6">
+          <div>
+            <div className="flex items-center justify-between mb-4 border-b border-outline-variant/50 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-on-background">Departamentos / Secciones</h3>
+                  <p className="text-xs text-secondary">{deptField.options.length} registrados</p>
+                </div>
+              </div>
+            </div>
+
+            {/* List of departments */}
+            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+              {deptField.options.map((dept, index) => {
+                const isEditing = editingDeptIndex === index;
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-outline-variant/60 bg-surface-container-lowest hover:border-primary/40 transition-all group"
+                  >
+                    {isEditing ? (
+                      <div className="flex items-center gap-2 w-full">
+                        <input
+                          type="text"
+                          value={editingDeptValue}
+                          onChange={(e) => setEditingDeptValue(e.target.value)}
+                          className="flex-1 bg-surface border border-primary rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none"
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEditDept(index)}
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleSaveEditDept(index)}
+                          className="p-1.5 bg-primary text-on-primary rounded-lg hover:bg-primary-container transition-colors"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingDeptIndex(null)}
+                          className="p-1.5 bg-surface-variant text-secondary rounded-lg hover:bg-surface-container transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-primary" />
+                          <span className="text-sm font-semibold text-on-background">{dept}</span>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setEditingDeptIndex(index);
+                              setEditingDeptValue(dept);
+                            }}
+                            className="p-1.5 text-secondary hover:text-primary hover:bg-surface-variant rounded-lg transition-colors"
+                            title="Editar nombre"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveDept(dept)}
+                            disabled={deptField.options.length <= 1}
+                            className="p-1.5 text-secondary hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Eliminar departamento"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex bg-surface-variant p-1 rounded-lg w-full md:w-auto">
-            {(['all', 'active', 'inactive'] as const).map((status) => (
+
+          {/* Add new department input */}
+          <div className="pt-4 border-t border-outline-variant/50">
+            <label className="block text-xs font-bold uppercase tracking-wider text-secondary mb-2">
+              Añadir Nuevo Departamento / Sección
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Ej: Operaciones, Comisaría, RRHH..."
+                value={newDeptInput}
+                onChange={(e) => setNewDeptInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddDept()}
+                className="flex-1 bg-surface-container-lowest border border-outline-variant rounded-xl px-4 py-2.5 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-fixed-dim transition-all"
+              />
               <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
+                onClick={handleAddDept}
+                disabled={!newDeptInput.trim()}
                 className={cn(
-                  "flex-1 md:flex-none px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all",
-                  statusFilter === status
-                    ? "bg-white text-on-background shadow-sm"
-                    : "text-secondary hover:text-on-surface"
+                  "px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all",
+                  newDeptInput.trim()
+                    ? "bg-primary text-on-primary hover:bg-primary-container shadow-sm cursor-pointer"
+                    : "bg-surface-variant text-outline cursor-not-allowed"
                 )}
               >
-                {status === 'all' ? 'Todos' : status === 'active' ? 'Activos' : 'Inactivos'}
+                <Plus className="w-4 h-4" />
+                Añadir
               </button>
-            ))}
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-surface-container-lowest border-b border-outline-variant/50">
-                <th className="px-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider">Empleado</th>
-                <th className="px-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider hidden md:table-cell">Segmentos (Top 2)</th>
-                <th className="px-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/50">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-secondary">Cargando directorio...</td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center">
-                    <Filter className="w-8 h-8 text-outline mx-auto mb-3" />
-                    <p className="text-sm text-secondary">No se encontraron empleados.</p>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-surface-container-low transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-slate-600 text-xs font-bold shrink-0">
-                          {emp.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-on-background">{emp.full_name}</p>
-                          <p className="text-xs text-secondary flex items-center gap-1 mt-0.5">
-                            <Mail className="w-3 h-3" /> {emp.email}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border",
-                        emp.is_active 
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : "bg-surface-variant text-secondary border-outline-variant"
-                      )}>
-                        {emp.is_active ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                        {emp.is_active ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 hidden md:table-cell">
-                      <div className="flex gap-2 flex-wrap">
-                        {Object.entries(emp.segments).slice(0, 2).map(([key, val]) => (
-                          <span key={key} className="text-[10px] font-bold uppercase tracking-wider bg-surface-variant px-2 py-1 rounded text-secondary border border-outline-variant/50">
-                            {val}
-                          </span>
-                        ))}
-                        {Object.keys(emp.segments).length > 2 && (
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-secondary px-1 py-1">
-                            +{Object.keys(emp.segments).length - 2}
-                          </span>
-                        )}
-                        {Object.keys(emp.segments).length === 0 && (
-                          <span className="text-xs text-outline italic">Sin segmentos</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => toggleEmployeeActive(emp.id)}
-                          className="text-xs font-semibold text-primary hover:underline px-2 py-1"
+        {/* Location / Territory Card */}
+        <div className="card p-6 flex flex-col justify-between space-y-6">
+          <div>
+            <div className="flex items-center justify-between mb-4 border-b border-outline-variant/50 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-on-background">Territorios / Zonas / Ubicaciones</h3>
+                  <p className="text-xs text-secondary">{locField.options.length} registradas</p>
+                </div>
+              </div>
+            </div>
+
+            {/* List of locations */}
+            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+              {locField.options.map((loc, index) => {
+                const isEditing = editingLocIndex === index;
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-outline-variant/60 bg-surface-container-lowest hover:border-primary/40 transition-all group"
+                  >
+                    {isEditing ? (
+                      <div className="flex items-center gap-2 w-full">
+                        <input
+                          type="text"
+                          value={editingLocValue}
+                          onChange={(e) => setEditingLocValue(e.target.value)}
+                          className="flex-1 bg-surface border border-primary rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none"
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEditLoc(index)}
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleSaveEditLoc(index)}
+                          className="p-1.5 bg-primary text-on-primary rounded-lg hover:bg-primary-container transition-colors"
                         >
-                          {emp.is_active ? 'Desactivar' : 'Activar'}
+                          <Check className="w-4 h-4" />
                         </button>
-                        <button className="p-1.5 text-secondary hover:bg-surface-variant rounded-md transition-colors">
-                          <MoreVertical className="w-4 h-4" />
+                        <button
+                          onClick={() => setEditingLocIndex(null)}
+                          className="p-1.5 bg-surface-variant text-secondary rounded-lg hover:bg-surface-container transition-colors"
+                        >
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-purple-600" />
+                          <span className="text-sm font-semibold text-on-background">{loc}</span>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setEditingLocIndex(index);
+                              setEditingLocValue(loc);
+                            }}
+                            className="p-1.5 text-secondary hover:text-primary hover:bg-surface-variant rounded-lg transition-colors"
+                            title="Editar nombre"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveLoc(loc)}
+                            disabled={locField.options.length <= 1}
+                            className="p-1.5 text-secondary hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Eliminar territorio"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Add new location input */}
+          <div className="pt-4 border-t border-outline-variant/50">
+            <label className="block text-xs font-bold uppercase tracking-wider text-secondary mb-2">
+              Añadir Nuevo Territorio / Zona
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Ej: Bilbao, Vitoria, San Sebastián, Zona Sur..."
+                value={newLocInput}
+                onChange={(e) => setNewLocInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddLoc()}
+                className="flex-1 bg-surface-container-lowest border border-outline-variant rounded-xl px-4 py-2.5 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-fixed-dim transition-all"
+              />
+              <button
+                onClick={handleAddLoc}
+                disabled={!newLocInput.trim()}
+                className={cn(
+                  "px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all",
+                  newLocInput.trim()
+                    ? "bg-primary text-on-primary hover:bg-primary-container shadow-sm cursor-pointer"
+                    : "bg-surface-variant text-outline cursor-not-allowed"
+                )}
+              >
+                <Plus className="w-4 h-4" />
+                Añadir
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

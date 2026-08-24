@@ -33,7 +33,7 @@ export function Sidebar({ currentView, onViewChange, userName, userRole, userEma
     { id: 'campaigns', label: 'Automatización', icon: Send },
     { id: 'reporting', label: 'Reporting', icon: BarChart2 },
     { id: 'insights', label: 'Insights', icon: BrainCircuit },
-    { id: 'directory', label: 'Directory', icon: Users },
+    { id: 'directory', label: 'Estructura', icon: Users },
   ];
 
   // Filter nav items based on role
