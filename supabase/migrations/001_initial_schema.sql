@@ -312,13 +312,9 @@ CREATE POLICY "Admins and Managers can update campaigns"
 
 -- ─── Policies: Questions ───────────────────────────────────
 
-CREATE POLICY "Users can view questions"
+CREATE POLICY "Anyone can view questions for survey"
   ON questions FOR SELECT
-  USING (
-    campaign_id IN (
-      SELECT id FROM campaigns WHERE organization_id = get_user_org_id()
-    )
-  );
+  USING (true);
 
 CREATE POLICY "Admins and Managers can manage questions"
   ON questions FOR ALL
@@ -330,8 +326,10 @@ CREATE POLICY "Admins and Managers can manage questions"
   );
 
 -- ─── Policies: Responses ───────────────────────────────────
--- Responses are inserted via service role (server-side) when employees submit.
--- Platform users can only SELECT aggregated data.
+
+CREATE POLICY "Anyone can insert survey responses"
+  ON responses FOR INSERT
+  WITH CHECK (true);
 
 CREATE POLICY "Users can view responses in their organization"
   ON responses FOR SELECT

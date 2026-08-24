@@ -44,12 +44,17 @@ export function SurveyView({ onBack }: { onBack: () => void }) {
         if (data && data.length > 0) {
           setQuestions(data as unknown as Question[]);
         } else {
-          // Fallback to mock for local testing without DB
-          console.warn("No questions found, possibly missing DB. Falling back to mock.");
+          // Fallback to full 8 mock questions if questions table is empty or unreadable
           setQuestions([
-            { id: 'mock-1', campaign_id: campaignId, text: '¿Sientes que tus aportaciones son reconocidas?', dimension: 'Reconocimiento', order_index: 0, is_required: true },
-            { id: 'mock-2', campaign_id: campaignId, text: '¿Tu carga de trabajo es equilibrada?', dimension: 'Bienestar', order_index: 1, is_required: true }
-          ]);
+            { id: 'q-1', campaign_id: campaignId, text: '¿Sientes que tus aportaciones y logros son reconocidos de forma justa en tu equipo?', dimension: 'Reconocimiento', order_index: 0, is_required: true },
+            { id: 'q-2', campaign_id: campaignId, text: '¿Tu líder directo te brinda retroalimentación útil y oportuna?', dimension: 'Liderazgo', order_index: 1, is_required: true },
+            { id: 'q-3', campaign_id: campaignId, text: '¿Consideras que tienes oportunidades reales de crecimiento profesional?', dimension: 'Crecimiento', order_index: 2, is_required: true },
+            { id: 'q-4', campaign_id: campaignId, text: '¿Tu carga de trabajo te permite mantener un equilibrio con tu vida personal?', dimension: 'Bienestar', order_index: 3, is_required: true },
+            { id: 'q-5', campaign_id: campaignId, text: '¿Sientes que la comunicación en tu equipo es abierta y transparente?', dimension: 'Liderazgo', order_index: 4, is_required: true },
+            { id: 'q-6', campaign_id: campaignId, text: '¿Te sientes valorado/a como profesional en esta organización?', dimension: 'Reconocimiento', order_index: 5, is_required: true },
+            { id: 'q-7', campaign_id: campaignId, text: '¿Los recursos y herramientas que tienes son adecuados para hacer bien tu trabajo?', dimension: 'Bienestar', order_index: 6, is_required: true },
+            { id: 'q-8', campaign_id: campaignId, text: '¿Recomendarías esta empresa como un excelente lugar para trabajar?', dimension: 'General', order_index: 7, is_required: true },
+          ] as unknown as Question[]);
         }
       } catch (err) {
         console.error('Error fetching questions:', err);
