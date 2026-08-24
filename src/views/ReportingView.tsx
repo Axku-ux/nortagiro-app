@@ -56,6 +56,8 @@ const HEATMAP_DATA = [
   { dept: 'Marketing', liderazgo: 9.1, crecimiento: 8.5, reconocimiento: 7.8, bienestar: 9.2 },
 ];
 
+import { useDashboardData } from '../hooks/useDashboardData';
+
 export function ReportingView() {
   const { campaigns } = useCampaigns();
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
@@ -63,10 +65,36 @@ export function ReportingView() {
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [exportMessage, setExportMessage] = useState<string | null>(null);
 
+  const { data, loading } = useDashboardData(selectedCampaign === 'all' ? undefined : selectedCampaign);
+
+  // Compute dynamic heatmap array for the table
+  // data.heatmap is { dimension: string, scores: { [dept]: number } }[]
+  // We want rows by department, columns by dimension
+  const dimensions = data?.heatmap.map(h => h.dimension) || [];
+  const departments = data?.departments || [];
+  
+  const heatmapRows = departments.map(dept => {
+    const row: any = { dept };
+    dimensions.forEach(dim => {
+      const hData = data?.heatmap.find(h => h.dimension === dim);
+      row[dim] = hData?.scores[dept] || 0;
+    });
+    return row;
+  });
+
+  const dimensionScores = data?.heatmap.map(h => {
+    const vals = Object.values(h.scores);
+    const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    return { name: h.dimension, score: Number(avg.toFixed(1)), color: '#3b82f6' };
+  }) || [];
+
   const handleExportCSV = () => {
+    const cols = ['Departamento', ...dimensions];
     const csvContent = "data:text/csv;charset=utf-8," 
-      + "Departamento,Liderazgo,Crecimiento,Reconocimiento,Bienestar\n"
-      + HEATMAP_DATA.map(e => `${e.dept},${e.liderazgo},${e.crecimiento},${e.reconocimiento},${e.bienestar}`).join("\n");
+      + cols.join(',') + "\n"
+      + heatmapRows.map(row => {
+          return [row.dept, ...dimensions.map(d => row[d])].join(',');
+        }).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -192,8 +220,7 @@ export function ReportingView() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-on-background">8.4</span>
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">+0.6 vs anterior</span>
+            <span className="text-3xl font-extrabold text-on-background">{data?.metrics?.globalScore || 0}</span>
           </div>
           <p className="text-xs text-secondary mt-2">Escala de 1 a 10 (Promedio global)</p>
         </div>
@@ -206,10 +233,9 @@ export function ReportingView() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-on-background">+52</span>
-            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Excelente</span>
+            <span className="text-3xl font-extrabold text-on-background">{data?.metrics?.enps > 0 ? '+' : ''}{data?.metrics?.enps || 0}</span>
           </div>
-          <p className="text-xs text-secondary mt-2">58% Promotores · 26% Neutros · 16% Detractores</p>
+          <p className="text-xs text-secondary mt-2">{data?.metrics?.enpsPromoters || 0}% Promotores · {data?.metrics?.enpsNeutral || 0}% Neutros · {data?.metrics?.enpsDetractors || 0}% Detractores</p>
         </div>
 
         <div className="card p-6">
@@ -220,8 +246,7 @@ export function ReportingView() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-on-background">87%</span>
-            <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">Muestreo alto</span>
+            <span className="text-3xl font-extrabold text-on-background">{data?.metrics?.participationRate || 0}%</span>
           </div>
           <p className="text-xs text-secondary mt-2">Anonimato 100% garantizado</p>
         </div>
@@ -234,10 +259,9 @@ export function ReportingView() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-on-background">14%</span>
-            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Bajo riesgo</span>
+            <span className="text-3xl font-extrabold text-on-background">{data?.metrics?.burnoutRisk || 0}%</span>
           </div>
-          <p className="text-xs text-secondary mt-2">Atención prioritaria en Sales</p>
+          <p className="text-xs text-secondary mt-2">Respuestas de bienestar críticas</p>
         </div>
       </div>
 
@@ -280,13 +304,13 @@ export function ReportingView() {
           </div>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={DIMENSION_SCORES} layout="vertical">
+              <BarChart data={dimensionScores} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                 <XAxis type="number" domain={[0, 10]} stroke="#64748b" fontSize={12} />
                 <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={11} width={100} />
                 <Tooltip />
                 <Bar dataKey="score" name="Puntuación" radius={[0, 8, 8, 0]}>
-                  {DIMENSION_SCORES.map((entry, index) => (
+                  {dimensionScores.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Bar>
@@ -315,36 +339,22 @@ export function ReportingView() {
             <thead>
               <tr className="border-b border-outline-variant/60">
                 <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider">Departamento</th>
-                <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider text-center">Liderazgo</th>
-                <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider text-center">Crecimiento</th>
-                <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider text-center">Reconocimiento</th>
-                <th className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider text-center">Bienestar</th>
+                {dimensions.map(dim => (
+                  <th key={dim} className="py-3 px-4 text-xs font-bold text-secondary uppercase tracking-wider text-center">{dim}</th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
-              {HEATMAP_DATA.map((row) => (
+              {heatmapRows.map((row) => (
                 <tr key={row.dept} className="hover:bg-surface-container-low transition-colors">
                   <td className="py-4 px-4 font-bold text-sm text-on-background">{row.dept}</td>
-                  <td className="py-4 px-4 text-center">
-                    <span className={cn("inline-block px-3 py-1 rounded-lg text-xs border", getRatingColor(row.liderazgo))}>
-                      {row.liderazgo}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <span className={cn("inline-block px-3 py-1 rounded-lg text-xs border", getRatingColor(row.crecimiento))}>
-                      {row.crecimiento}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <span className={cn("inline-block px-3 py-1 rounded-lg text-xs border", getRatingColor(row.reconocimiento))}>
-                      {row.reconocimiento}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <span className={cn("inline-block px-3 py-1 rounded-lg text-xs border", getRatingColor(row.bienestar))}>
-                      {row.bienestar}
-                    </span>
-                  </td>
+                  {dimensions.map(dim => (
+                    <td key={dim} className="py-4 px-4 text-center">
+                      <span className={cn("inline-block px-3 py-1 rounded-lg text-xs border", getRatingColor(row[dim]))}>
+                        {row[dim]}
+                      </span>
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>

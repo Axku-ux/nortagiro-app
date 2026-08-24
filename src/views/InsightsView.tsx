@@ -13,46 +13,18 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const MOCK_AI_INSIGHTS = [
-  {
-    id: 'ins-1',
-    type: 'alert',
-    severity: 'critical',
-    title: 'Riesgo de desinterés en el Departamento de Sales',
-    description: 'La dimensión de Reconocimiento ha caído a 6.2 en el equipo comercial. Se detectan comentarios recurrentes sobre la falta de visibilidad del esfuerzo individual en objetivos trimestrales.',
-    department: 'Sales',
-    action: 'Implementar programa de reconocimientos mensuales y revisión de comisiones.',
-  },
-  {
-    id: 'ins-2',
-    type: 'praise',
-    severity: 'info',
-    title: 'Excelente liderazgo y clima en el equipo de Marketing',
-    description: 'El equipo de Marketing alcanza una satisfacción de 9.1 en Liderazgo y Bienestar. La flexibilidad horaria y la autonomía asignada son los factores mejor valorados.',
-    department: 'Marketing',
-    action: 'Documentar mejores prácticas del responsable de área para compartirlas con otros líderes.',
-  },
-  {
-    id: 'ins-3',
-    type: 'opportunity',
-    severity: 'warning',
-    title: 'Oportunidad de mejora en Crecimiento Profesional en Ops',
-    description: 'El 64% de los empleados en Operaciones señalan que no perciben un plan de carrera claro a 2 años vista, a pesar de valorar positivamente el ambiente laboral.',
-    department: 'Ops',
-    action: 'Diseñar matriz de competencias y planes de desarrollo individuales.',
-  },
-];
+import { useDashboardData } from '../hooks/useDashboardData';
 
 export function InsightsView() {
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [insights, setInsights] = useState(MOCK_AI_INSIGHTS);
+  const { data, loading, refetch } = useDashboardData();
   const [recalculating, setRecalculating] = useState(false);
 
-  const handleRegenerate = () => {
+  const insights = data?.insights || [];
+
+  const handleRegenerate = async () => {
     setRecalculating(true);
-    setTimeout(() => {
-      setRecalculating(false);
-    }, 1500);
+    await refetch();
+    setRecalculating(false);
   };
 
   return (
@@ -92,12 +64,12 @@ export function InsightsView() {
               Resumen Ejecutivo de IA
             </h3>
             <p className="text-slate-300 text-sm leading-relaxed">
-              El análisis semántico de los comentarios y las puntuaciones indica que el clima organizacional global se mantiene saludable (8.4/10), pero requiere atención focalizada en el departamento de **Sales**.
+              El análisis dinámico procesa todas las respuestas y dimensiones de tu organización para detectar patrones clave y generar las alertas u oportunidades de mejora.
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10 text-center">
-              <p className="text-2xl font-extrabold text-emerald-400">3</p>
+              <p className="text-2xl font-extrabold text-emerald-400">{insights.length}</p>
               <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Insights Clave</p>
             </div>
             <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10 text-center">
@@ -142,13 +114,7 @@ export function InsightsView() {
                 {item.description}
               </p>
 
-              <div className="bg-surface-container-lowest p-3 rounded-xl border border-outline-variant/60 flex items-start gap-2 text-xs">
-                <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-on-background">Acción sugerida:</strong>{' '}
-                  <span className="text-secondary">{item.action}</span>
-                </div>
-              </div>
+              {/* Acción sugerida removed since API doesn't return it */}
             </div>
           );
         })}

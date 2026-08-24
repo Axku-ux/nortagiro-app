@@ -39,53 +39,6 @@ export interface DashboardData {
   insights: AIInsight[];
 }
 
-// ─── Mock Data (Premium Design fallback) ────────────────
-
-const MOCK_DATA: DashboardData = {
-  metrics: {
-    globalScore: 8.4,
-    globalDelta: 0.3,
-    enps: 42,
-    enpsPromoters: 55,
-    enpsNeutral: 32,
-    enpsDetractors: 13,
-    participationRate: 87,
-    participationDelta: 2,
-    burnoutRisk: 14,
-    burnoutDelta: -2,
-  },
-  departments: ['Tech', 'Sales', 'Ops', 'Marketing'],
-  heatmap: [
-    { dimension: 'Liderazgo', scores: { 'Tech': 8.2, 'Sales': 7.9, 'Ops': 6.5, 'Marketing': 8.8 } },
-    { dimension: 'Crecimiento', scores: { 'Tech': 7.5, 'Sales': 8.1, 'Ops': 5.8, 'Marketing': 7.2 } },
-    { dimension: 'Reconocimiento', scores: { 'Tech': 8.8, 'Sales': 9.2, 'Ops': 7.1, 'Marketing': 8.5 } },
-    { dimension: 'Bienestar', scores: { 'Tech': 6.4, 'Sales': 7.5, 'Ops': 5.2, 'Marketing': 7.8 } },
-  ],
-  insights: [
-    {
-      id: 'ins-1',
-      type: 'alert',
-      title: 'Riesgo de fuga en Operaciones',
-      description: 'Las puntuaciones de Bienestar y Crecimiento en el equipo de Ops han caído por debajo de 6.0.',
-      department: 'Ops',
-    },
-    {
-      id: 'ins-2',
-      type: 'opportunity',
-      title: 'Mejorar el balance en Tech',
-      description: 'El equipo de tecnología reporta alta carga de trabajo. Oportunidad para revisar las estimaciones de sprints.',
-      department: 'Tech',
-    },
-    {
-      id: 'ins-3',
-      type: 'praise',
-      title: 'Reconocimiento excepcional en Ventas',
-      description: 'Ventas lidera el índice de reconocimiento con un 9.2. El nuevo programa de incentivos está funcionando.',
-      department: 'Sales',
-    },
-  ]
-};
-
 // ─── Hook ───────────────────────────────────────────────
 
 export function useDashboardData(campaignId?: string) {
@@ -97,51 +50,126 @@ export function useDashboardData(campaignId?: string) {
     setLoading(true);
     try {
       // 1. Determine which campaign to load
-      // If no ID is passed, pick the most recently closed or active one.
       let targetId = campaignId;
       if (!targetId && campaigns.length > 0) {
-        targetId = campaigns[0].id; // using the most recent one since useCampaigns orders by created_at desc
+        targetId = campaigns[0].id;
       }
 
       if (!targetId) {
-        // No campaigns exist yet
         setData(null);
         return;
       }
 
-      // 2. Fetch from campaign_stats view
-      const { data: statsData, error: statsError } = await supabase
-        .from('campaign_stats')
-        .select('*')
-        .eq('campaign_id', targetId)
-        .single();
+      // 2. Fetch responses for this campaign with question dimensions
+      const { data: responses, error: respError } = await supabase
+        .from('responses')
+        .select(`
+          rating,
+          department,
+          questions ( dimension )
+        `)
+        .eq('campaign_id', targetId);
 
-      if (statsError) {
-        // If the view fails or is empty, use mock data for demo purposes
-        setData(MOCK_DATA);
+      if (respError) throw respError;
+
+      if (!responses || responses.length === 0) {
+        setData(null);
         return;
       }
 
-      // In a real implementation with real responses, we would map `statsData` here.
-      // For this MVP, we use MOCK_DATA as the base, but we dynamically generate
-      // the AI Insights using the real Gemini integration!
+      // 3. Compute Metrics
+      let totalRating = 0;
+      let promoters = 0;
+      let neutrals = 0;
+      let detractors = 0;
+
+      // Group for heatmap
+      // Map: dimension -> { department: { sum, count } }
+      const dimDeptStats: Record<string, Record<string, { sum: number, count: number }>> = {};
+      const uniqueDepartments = new Set<string>();
+
+      responses.forEach((r: any) => {
+        const rating = r.rating;
+        const dept = r.department || 'General';
+        const dimension = r.questions?.dimension || 'General';
+
+        uniqueDepartments.add(dept);
+        totalRating += rating;
+
+        if (rating >= 9) promoters++;
+        else if (rating >= 7) neutrals++;
+        else detractors++;
+
+        if (!dimDeptStats[dimension]) dimDeptStats[dimension] = {};
+        if (!dimDeptStats[dimension][dept]) dimDeptStats[dimension][dept] = { sum: 0, count: 0 };
+        
+        dimDeptStats[dimension][dept].sum += rating;
+        dimDeptStats[dimension][dept].count += 1;
+      });
+
+      const totalResponses = responses.length;
+      const globalScore = Number((totalRating / totalResponses).toFixed(1));
       
-      let dynamicData = { ...MOCK_DATA };
-      
+      const pctPromoters = Math.round((promoters / totalResponses) * 100);
+      const pctNeutrals = Math.round((neutrals / totalResponses) * 100);
+      const pctDetractors = Math.round((detractors / totalResponses) * 100);
+      const enps = pctPromoters - pctDetractors;
+
+      // Calculate Burnout Risk: percentage of responses in "Bienestar" that are <= 5
+      let wellbeingResponses = 0;
+      let burnoutSignals = 0;
+      responses.forEach((r: any) => {
+        if (r.questions?.dimension === 'Bienestar') {
+          wellbeingResponses++;
+          if (r.rating <= 5) burnoutSignals++;
+        }
+      });
+      const burnoutRisk = wellbeingResponses > 0 ? Math.round((burnoutSignals / wellbeingResponses) * 100) : 0;
+
+      const metrics: DashboardMetrics = {
+        globalScore,
+        globalDelta: 0, // Mocked delta for now
+        enps,
+        enpsPromoters: pctPromoters,
+        enpsNeutral: pctNeutrals,
+        enpsDetractors: pctDetractors,
+        participationRate: 100, // Hard to calculate without known denominators
+        participationDelta: 0,
+        burnoutRisk,
+        burnoutDelta: 0,
+      };
+
+      // 4. Construct Heatmap
+      const heatmap: HeatmapData[] = [];
+      for (const [dimension, depts] of Object.entries(dimDeptStats)) {
+        const scores: Record<string, number> = {};
+        for (const [dept, stats] of Object.entries(depts)) {
+          scores[dept] = Number((stats.sum / stats.count).toFixed(1));
+        }
+        heatmap.push({ dimension, scores });
+      }
+
+      // 5. Generate AI Insights
+      let insights: AIInsight[] = [];
       try {
-        const aiResponse = await generateAIInsights(MOCK_DATA.heatmap, MOCK_DATA.metrics);
+        const aiResponse = await generateAIInsights(heatmap, metrics);
         if (aiResponse.success && aiResponse.insights) {
-          dynamicData.insights = aiResponse.insights;
+          insights = aiResponse.insights;
         }
       } catch (aiError) {
-        console.error('Failed to generate dynamic AI insights, falling back to static:', aiError);
+        console.error('Failed to generate dynamic AI insights:', aiError);
       }
-      
-      setData(dynamicData);
+
+      setData({
+        metrics,
+        heatmap,
+        departments: Array.from(uniqueDepartments),
+        insights,
+      });
 
     } catch (err) {
       console.error('Error loading dashboard data:', err);
-      setData(MOCK_DATA); // Always fallback to mock in demo
+      setData(null);
     } finally {
       setLoading(false);
     }
