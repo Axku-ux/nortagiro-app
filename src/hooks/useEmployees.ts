@@ -25,7 +25,7 @@ export function getDepartmentOptions(segmentFields: SegmentFieldWithOptions[]): 
   if (field && Array.isArray(field.options) && field.options.length > 0) {
     return field.options;
   }
-  return ['Tech', 'Sales', 'Ops', 'Marketing', 'RRHH', 'Finance'];
+  return [];
 }
 
 export function getLocationOptions(segmentFields: SegmentFieldWithOptions[]): string[] {
@@ -42,7 +42,7 @@ export function getLocationOptions(segmentFields: SegmentFieldWithOptions[]): st
   if (field && Array.isArray(field.options) && field.options.length > 0) {
     return field.options;
   }
-  return ['Sede Central', 'Madrid', 'Barcelona', 'Remoto', 'Zona Norte'];
+  return [];
 }
 
 import { useAuth } from '../contexts/AuthContext';
@@ -158,12 +158,24 @@ export function useEmployees() {
           .eq('id', field.id);
         if (error) throw error;
         await fetchSegmentFields();
+      } else {
+        if (!user?.organizationId) return;
+        const { error } = await supabase
+          .from('segment_fields')
+          .insert([{
+            field_name: fieldName,
+            field_type: 'select',
+            options: newOptions,
+            organization_id: user.organizationId,
+          }] as unknown as never[]);
+        if (error) throw error;
+        await fetchSegmentFields();
       }
     } catch (error) {
       console.error('Error updating segment field options:', error);
       throw error;
     }
-  }, [segmentFields, fetchSegmentFields]);
+  }, [segmentFields, fetchSegmentFields, user?.organizationId]);
 
   const addOptionToField = useCallback(async (fieldName: string, option: string) => {
     const field = segmentFields.find(f => f?.field_name && f.field_name.toLowerCase().includes(fieldName.toLowerCase()));
