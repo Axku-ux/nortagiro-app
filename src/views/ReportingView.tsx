@@ -210,13 +210,32 @@ export function ReportingView() {
       {/* Series & Comparison Filters Bar */}
       <div className="card p-4 flex flex-wrap gap-4 items-center justify-between bg-surface-container-lowest border-primary/20 shadow-sm">
         <div className="flex flex-wrap items-center gap-4">
-          {/* Series selector */}
+          {/* Program selector */}
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-primary" />
             <span className="text-xs font-bold text-secondary uppercase tracking-wider">Programa:</span>
-            <div className="px-3 py-1.5 bg-primary/10 text-primary font-bold text-sm rounded-lg border border-primary/20">
-              {currentSeriesGroup?.seriesName || 'Encuesta de Clima'} ({seriesCampaigns.length} ediciones)
-            </div>
+            {data.allSeries.length > 1 ? (
+              <select
+                value={data.currentSeriesId}
+                onChange={(e) => {
+                  const targetSeries = data.allSeries.find(s => s.seriesId === e.target.value);
+                  if (targetSeries && targetSeries.campaigns.length > 0) {
+                    setSelectedCampaignId(targetSeries.campaigns[0].id);
+                  }
+                }}
+                className="bg-primary/10 text-primary border border-primary/20 rounded-lg px-3 py-1.5 text-sm font-bold focus:outline-none focus:border-primary shadow-sm cursor-pointer"
+              >
+                {data.allSeries.map((s) => (
+                  <option key={s.seriesId} value={s.seriesId} className="bg-surface text-on-surface">
+                    🏷️ {s.seriesName} ({s.campaigns.length} ediciones)
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="px-3 py-1.5 bg-primary/10 text-primary font-bold text-sm rounded-lg border border-primary/20">
+                {currentSeriesGroup?.seriesName || 'Encuesta de Clima'} ({seriesCampaigns.length} ediciones)
+              </div>
+            )}
           </div>
 
           {/* Primary Edition selector */}

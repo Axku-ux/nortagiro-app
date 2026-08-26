@@ -27,7 +27,7 @@ export function WizardView({
   repeatCampaignId?: string | null;
   editCampaignId?: string | null;
 }) {
-  const { createCampaign, mockQuestions, getCampaignWithQuestions } = useCampaigns();
+  const { createCampaign, mockQuestions, getCampaignWithQuestions, existingPrograms } = useCampaigns();
   const { segmentFields } = useEmployees();
 
   // Current step (1 to 5, where 5 is the final link distribution step)
@@ -43,6 +43,7 @@ export function WizardView({
 
   // Step 1: Config
   const [title, setTitle] = useState('');
+  const [programName, setProgramName] = useState(existingPrograms[0] || 'Clima Organizacional 360');
   const [description, setDescription] = useState('');
   const [periodLabel, setPeriodLabel] = useState('');
 
@@ -57,15 +58,18 @@ export function WizardView({
     async function loadSource() {
       const data = await getCampaignWithQuestions(targetId!);
       if (data && data.campaign) {
+        if (data.programName) {
+          setProgramName(data.programName);
+        }
         if (repeatCampaignId) {
           setRepeatedSourceTitle(data.campaign.title);
           setTitle(data.campaign.title);
-          setDescription(data.campaign.description || '');
+          setDescription(data.cleanDesc || '');
           setPeriodLabel('');
         } else if (editCampaignId) {
           setEditingSourceTitle(data.campaign.title);
           setTitle(data.campaign.title);
-          setDescription(data.campaign.description || '');
+          setDescription(data.cleanDesc || '');
           setPeriodLabel(data.campaign.period_label || '');
           if (data.campaign.starts_at) setStartsAt(data.campaign.starts_at.split('T')[0]);
           if (data.campaign.ends_at) setEndsAt(data.campaign.ends_at.split('T')[0]);
@@ -115,10 +119,10 @@ export function WizardView({
 
   const canProceed = (step: number): boolean => {
     switch (step) {
-      case 1: return title.trim().length > 0;
+      case 1: return title.trim().length > 0 && programName.trim().length > 0;
       case 2: return questions.length > 0;
       case 3: return selectedDepartments.length > 0 && selectedLocations.length > 0;
-      case 4: return title.trim().length > 0 && questions.length > 0;
+      case 4: return title.trim().length > 0 && programName.trim().length > 0 && questions.length > 0;
       default: return true;
     }
   };
@@ -145,6 +149,7 @@ export function WizardView({
       const campaignId = await createCampaign({
         title,
         description,
+        programName,
         periodLabel: periodLabel || `Campaña ${startsAt} - ${endsAt}`,
         startsAt,
         endsAt,
@@ -258,11 +263,14 @@ export function WizardView({
             title={title}
             description={description}
             periodLabel={periodLabel}
+            programName={programName}
             startsAt={startsAt}
             endsAt={endsAt}
+            existingPrograms={existingPrograms}
             onTitleChange={setTitle}
             onDescriptionChange={setDescription}
             onPeriodLabelChange={setPeriodLabel}
+            onProgramNameChange={setProgramName}
             onStartsAtChange={setStartsAt}
             onEndsAtChange={setEndsAt}
           />

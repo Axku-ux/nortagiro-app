@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Plus, 
   Search, 
@@ -15,7 +15,8 @@ import {
   X,
   Copy,
   Share2,
-  RotateCcw
+  RotateCcw,
+  Layers
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useCampaigns } from '../hooks/useCampaigns';
@@ -36,10 +37,11 @@ const STATUS_CONFIG: Record<CampaignStatus, { label: string; color: string; icon
 };
 
 export function CampaignsView({ onCreateNew, onEdit, onRepeat }: CampaignsViewProps) {
-  const { campaigns, loading } = useCampaigns();
+  const { campaigns, loading, existingPrograms } = useCampaigns();
   const { segmentFields } = useEmployees();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<CampaignStatus | 'all'>('all');
+  const [programFilter, setProgramFilter] = useState<string>('all');
   const [linksModalCampaign, setLinksModalCampaign] = useState<{ id: string; title: string } | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -61,9 +63,11 @@ export function CampaignsView({ onCreateNew, onEdit, onRepeat }: CampaignsViewPr
   };
 
   const filtered = campaigns.filter((c) => {
-    const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          c.programName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesProgram = programFilter === 'all' || c.programName === programFilter;
+    return matchesSearch && matchesStatus && matchesProgram;
   });
 
   const statusCounts = {
@@ -92,17 +96,39 @@ export function CampaignsView({ onCreateNew, onEdit, onRepeat }: CampaignsViewPr
       </header>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
-          <input
-            type="text"
-            placeholder="Buscar campañas..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-10 pr-4 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-fixed-dim transition-all"
-          />
+      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-3 flex-1">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
+            <input
+              type="text"
+              placeholder="Buscar por campaña o programa..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-10 pr-4 py-2.5 text-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-fixed-dim transition-all"
+            />
+          </div>
+
+          {/* Program filter select */}
+          {existingPrograms.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-surface border border-outline-variant rounded-xl px-3 py-2">
+              <Layers className="w-4 h-4 text-primary shrink-0" />
+              <select
+                value={programFilter}
+                onChange={(e) => setProgramFilter(e.target.value)}
+                className="bg-transparent text-xs font-bold text-on-surface focus:outline-none cursor-pointer"
+              >
+                <option value="all">Todos los Programas</option>
+                {existingPrograms.map((prog) => (
+                  <option key={prog} value={prog}>
+                    {prog}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
+
         <div className="flex gap-2 flex-wrap">
           {(['all', 'active', 'draft', 'scheduled', 'closed'] as const).map((status) => (
             <button
@@ -147,11 +173,11 @@ export function CampaignsView({ onCreateNew, onEdit, onRepeat }: CampaignsViewPr
             return (
               <div
                 key={campaign.id}
-                className="card p-6 text-left flex flex-col justify-between group hover:border-primary/30 transition-all"
+                className="card p-6 text-left flex flex-col justify-between group hover:border-primary/30 transition-all shadow-sm"
               >
                 <div>
-                  {/* Status badge */}
-                  <div className="flex items-center justify-between mb-4">
+                  {/* Status and Links badge */}
+                  <div className="flex items-center justify-between mb-3">
                     <span className={cn(
                       "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border",
                       config.color
@@ -161,7 +187,7 @@ export function CampaignsView({ onCreateNew, onEdit, onRepeat }: CampaignsViewPr
                     </span>
                     <button
                       onClick={() => setLinksModalCampaign({ id: campaign.id, title: campaign.title })}
-                      className="text-xs font-bold text-primary hover:bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20 flex items-center gap-1 transition-colors"
+                      className="text-xs font-bold text-primary hover:bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20 flex items-center gap-1 transition-colors cursor-pointer"
                       title="Ver y copiar enlaces de encuesta"
                     >
                       <LinkIcon className="w-3.5 h-3.5" />
@@ -169,19 +195,29 @@ export function CampaignsView({ onCreateNew, onEdit, onRepeat }: CampaignsViewPr
                     </button>
                   </div>
 
+                  {/* Program Tag */}
+                  {campaign.programName && (
+                    <div className="mb-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 text-[11px] font-bold">
+                        <Layers className="w-3 h-3" />
+                        {campaign.programName}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Title */}
                   <h3 className="text-lg font-semibold text-on-background mb-1 tracking-tight">
                     {campaign.title}
                   </h3>
-                  <p className="text-xs text-secondary font-medium mb-4 flex items-center gap-1">
+                  <p className="text-xs text-secondary font-medium mb-3 flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
                     {campaign.period_label}
                   </p>
 
                   {/* Description */}
-                  {campaign.description && (
+                  {campaign.cleanDesc && (
                     <p className="text-sm text-on-surface-variant mb-4 line-clamp-2 leading-relaxed">
-                      {campaign.description}
+                      {campaign.cleanDesc}
                     </p>
                   )}
                 </div>

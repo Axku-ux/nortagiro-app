@@ -286,17 +286,15 @@ export function useDashboardData(campaignId?: string, compareCampaignId?: string
         campaignSignature[c.id] = sig || c.title.toLowerCase().replace(/q\d|\d{4}|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic/gi, '').trim();
       });
 
-      // Group campaigns into Series
+      // Group campaigns into Programs / Series
       const seriesMap: Record<string, CampaignSeriesGroup> = {};
       campaigns.forEach(c => {
-        const sig = campaignSignature[c.id];
-        const seriesKey = sig || 'general-series';
+        const progName = c.programName || 'Clima Organizacional 360';
+        const seriesKey = progName.toLowerCase().trim();
         if (!seriesMap[seriesKey]) {
-          // Clean name from first campaign title
-          const cleanName = c.title.replace(/\s*-\s*q\d.*|\s*q\d.*|\s*\(\d{4}\).*/i, '').trim() || 'Encuesta de Clima';
           seriesMap[seriesKey] = {
             seriesId: seriesKey,
-            seriesName: cleanName,
+            seriesName: progName,
             campaigns: [],
           };
         }
@@ -309,8 +307,8 @@ export function useDashboardData(campaignId?: string, compareCampaignId?: string
       });
 
       const allSeries = Object.values(seriesMap);
-      const currentSig = campaignSignature[targetId] || 'general-series';
-      const currentSeriesGroup = seriesMap[currentSig] || allSeries[0];
+      const currentProgramName = (currentCampaign.programName || 'Clima Organizacional 360').toLowerCase().trim();
+      const currentSeriesGroup = seriesMap[currentProgramName] || allSeries[0];
       const seriesCampaigns = currentSeriesGroup ? currentSeriesGroup.campaigns : campaigns;
 
       // 3. Fetch responses for target campaign

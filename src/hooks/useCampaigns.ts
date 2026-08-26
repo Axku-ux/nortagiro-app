@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Campaign, CampaignStatus, Question, ReminderConfig } from '../lib/database.types';
@@ -6,6 +6,8 @@ import type { Campaign, CampaignStatus, Question, ReminderConfig } from '../lib/
 // ─── Types ──────────────────────────────────────────────
 
 export interface CampaignWithStats extends Campaign {
+  programName: string;
+  cleanDesc: string;
   totalInvited: number;
   totalResponded: number;
   participationRate: number;
@@ -15,6 +17,7 @@ export interface CampaignWithStats extends Campaign {
 export interface CampaignDraft {
   title: string;
   description: string;
+  programName?: string;
   periodLabel: string;
   startsAt: string;
   endsAt: string;
@@ -29,6 +32,25 @@ export interface QuestionDraft {
   dimension: string;
   orderIndex: number;
   isRequired: boolean;
+}
+
+// ─── Helpers ────────────────────────────────────────────
+
+export function extractProgramName(description: string | null | undefined, title: string): string {
+  if (description) {
+    const match = description.match(/\[Programa:\s*([^\]]+)\]/i);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  // Fallback from title (e.g. "Clima 360 - Q1 2025" -> "Clima 360")
+  const fallback = title.replace(/\s*-\s*q\d.*|\s*q\d.*|\s*\(\d{4}\).*/i, '').trim();
+  return fallback || 'Programa General';
+}
+
+export function cleanDescription(description: string | null | undefined): string {
+  if (!description) return '';
+  return description.replace(/\[Programa:\s*[^\]]+\]\n?/gi, '').trim();
 }
 
 // ─── Templates ──────────────────────────────────────────
@@ -70,10 +92,10 @@ export function useCampaigns() {
       if (fetchError) throw fetchError;
 
       if (data) {
-        // Real data from Supabase — map to CampaignWithStats
-        // In a real app with views, you'd fetch from campaign_stats instead
         const mapped: CampaignWithStats[] = (data as unknown as Campaign[]).map((c) => ({
           ...c,
+          programName: extractProgramName(c.description, c.title),
+          cleanDesc: cleanDescription(c.description),
           totalInvited: 0,
           totalResponded: 0,
           participationRate: 0,
@@ -93,16 +115,36 @@ export function useCampaigns() {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
+  // List of unique program names across all campaigns
+  const existingPrograms = useMemo(() => {
+    const set = new Set<string>();
+    campaigns.forEach(c => {
+      if (c.programName) set.add(c.programName);
+    });
+    if (set.size === 0) {
+      set.add('Clima Organizacional 360');
+    }
+    return Array.from(set);
+  }, [campaigns]);
+
   const createCampaign = useCallback(async (draft: CampaignDraft): Promise<string> => {
     if (!user?.organizationId) throw new Error("No user authenticated");
     try {
+      // Embed program name in description if provided
+      let finalDescription = draft.description || '';
+      if (draft.programName && draft.programName.trim().length > 0) {
+        const progTag = `[Programa: ${draft.programName.trim()}]`;
+        const rawClean = cleanDescription(finalDescription);
+        finalDescription = rawClean ? `${progTag}\n${rawClean}` : progTag;
+      }
+
       const { data, error: insertError } = await supabase
         .from('campaigns')
         .insert([{
           title: draft.title,
-          description: draft.description,
+          description: finalDescription || null,
           period_label: draft.periodLabel,
-          status: 'active' as CampaignStatus, // Directly active for links
+          status: 'active' as CampaignStatus,
           starts_at: draft.startsAt || new Date().toISOString(),
           ends_at: draft.endsAt || null,
           reminder_config: draft.reminderConfig,
@@ -173,8 +215,11 @@ export function useCampaigns() {
 
       if (qError) throw qError;
 
+      const c = campaign as Campaign;
       return {
-        campaign: campaign as Campaign,
+        campaign: c,
+        programName: extractProgramName(c.description, c.title),
+        cleanDesc: cleanDescription(c.description),
         questions: (questions || []) as Question[],
       };
     } catch (err) {
@@ -185,6 +230,7 @@ export function useCampaigns() {
 
   return {
     campaigns,
+    existingPrograms,
     loading,
     error,
     fetchCampaigns,
