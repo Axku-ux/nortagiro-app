@@ -117,9 +117,14 @@ function AppShell({ user, onSignOut }: AppShellProps) {
 
   const [currentView, setCurrentViewRaw] = useState<View>(getInitialView);
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+  const [repeatingCampaignId, setRepeatingCampaignId] = useState<string | null>(null);
 
   const setCurrentView = (v: View) => {
     setCurrentViewRaw(v);
+    if (v !== 'wizard') {
+      setRepeatingCampaignId(null);
+      setEditingCampaignId(null);
+    }
     try {
       const targetPath = v === 'dashboard' ? '/' : `/${v}`;
       if (window.location.pathname !== targetPath) {
@@ -162,15 +167,28 @@ function AppShell({ user, onSignOut }: AppShellProps) {
             {currentView === 'dashboard' && <DashboardView onNavigate={(v) => setCurrentView(v as View)} />}
             {currentView === 'campaigns' && (
               <CampaignsView 
-                onCreateNew={() => setCurrentView('wizard')}
+                onCreateNew={() => {
+                  setRepeatingCampaignId(null);
+                  setCurrentView('wizard');
+                }}
                 onEdit={(id) => {
                   setEditingCampaignId(id);
+                  setCurrentView('wizard');
+                }}
+                onRepeat={(id) => {
+                  setRepeatingCampaignId(id);
                   setCurrentView('wizard');
                 }}
               />
             )}
             {currentView === 'wizard' && (
-              <WizardView onBack={() => setCurrentView('campaigns')} />
+              <WizardView 
+                repeatCampaignId={repeatingCampaignId}
+                onBack={() => {
+                  setRepeatingCampaignId(null);
+                  setCurrentView('campaigns');
+                }} 
+              />
             )}
             {currentView === 'reporting' && <ReportingView />}
             {currentView === 'insights' && <InsightsView />}

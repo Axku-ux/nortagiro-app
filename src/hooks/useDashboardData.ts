@@ -56,10 +56,51 @@ export interface QuestionRanking {
 }
 
 export interface HistoricalPoint {
+  campaignId: string;
   campaignTitle: string;
+  periodLabel: string;
   globalScore: number;
   enps: number;
   participation: number;
+  burnoutRisk: number;
+  dimensions: Record<string, number>;
+}
+
+export interface QuestionComparison {
+  questionId: string;
+  text: string;
+  dimension: string;
+  currentScore: number;
+  previousScore: number | null;
+  delta: number | null;
+  status: 'improved' | 'declined' | 'stable' | 'new';
+  currentDistribution: number[];
+  totalResponses: number;
+}
+
+export interface DimensionComparison {
+  dimension: string;
+  currentScore: number;
+  previousScore: number | null;
+  delta: number | null;
+  status: 'improved' | 'declined' | 'stable';
+}
+
+export interface ActionImpactSummary {
+  improvedDimensionsCount: number;
+  declinedDimensionsCount: number;
+  stableDimensionsCount: number;
+  topPositiveDimension: string | null;
+  topPositiveDelta: number;
+  topConcernDimension: string | null;
+  topConcernDelta: number;
+  diagnosisText: string;
+}
+
+export interface CampaignSeriesGroup {
+  seriesId: string;
+  seriesName: string;
+  campaigns: { id: string; title: string; periodLabel: string; createdAt: string }[];
 }
 
 export interface DashboardData {
@@ -69,7 +110,6 @@ export interface DashboardData {
   heatmapLocation: HeatmapData[];
   locations: string[];
   insights: AIInsight[];
-  // New fields for restructured views
   alerts: QuickAlert[];
   sparklines: {
     globalScore: SparklinePoint[];
@@ -80,19 +120,42 @@ export interface DashboardData {
   questionRanking: QuestionRanking[];
   historicalTrend: HistoricalPoint[];
   activeCampaign: { title: string; responded: number; total: number } | null;
+  
+  // Longitudinal Series & Comparison
+  allSeries: CampaignSeriesGroup[];
+  currentSeriesId: string;
+  questionComparisons: QuestionComparison[];
+  dimensionComparisons: DimensionComparison[];
+  actionImpactSummary: ActionImpactSummary;
+  comparisonCampaignTitle: string | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────
 
-/** Compute basic metrics from a raw responses array */
-function computeMetricsFromResponses(responses: any[]): {
+/** Compute basic metrics and question/dimension maps from raw responses */
+function analyzeResponses(responses: any[]): {
   globalScore: number;
   enps: number;
+  pctPromoters: number;
+  pctNeutrals: number;
+  pctDetractors: number;
   participationCount: number;
   burnoutRisk: number;
+  dimensionAvgs: Record<string, number>;
+  questionAvgs: Record<string, { text: string; dimension: string; avg: number; count: number; distribution: number[] }>;
 } {
   if (!responses || responses.length === 0) {
-    return { globalScore: 0, enps: 0, participationCount: 0, burnoutRisk: 0 };
+    return {
+      globalScore: 0,
+      enps: 0,
+      pctPromoters: 0,
+      pctNeutrals: 0,
+      pctDetractors: 0,
+      participationCount: 0,
+      burnoutRisk: 0,
+      dimensionAvgs: {},
+      questionAvgs: {},
+    };
   }
 
   let totalRating = 0;
@@ -103,6 +166,8 @@ function computeMetricsFromResponses(responses: any[]): {
   let burnoutSignals = 0;
 
   const uniqueQuestionIds = new Set<string>();
+  const dimStats: Record<string, { sum: number; count: number }> = {};
+  const qStats: Record<string, { text: string; dimension: string; sum: number; count: number; distribution: number[] }> = {};
 
   responses.forEach((r: any) => {
     const rating = r.rating;
@@ -113,7 +178,26 @@ function computeMetricsFromResponses(responses: any[]): {
     else if (rating >= 7) neutrals++;
     else detractors++;
 
-    if (r.questions?.dimension === 'Bienestar') {
+    const dim = r.questions?.dimension || 'General';
+    const text = r.questions?.text || '';
+    const qId = r.question_id || text;
+
+    if (!dimStats[dim]) dimStats[dim] = { sum: 0, count: 0 };
+    dimStats[dim].sum += rating;
+    dimStats[dim].count += 1;
+
+    if (qId) {
+      if (!qStats[qId]) {
+        qStats[qId] = { text, dimension: dim, sum: 0, count: 0, distribution: new Array(10).fill(0) };
+      }
+      qStats[qId].sum += rating;
+      qStats[qId].count += 1;
+      if (rating >= 1 && rating <= 10) {
+        qStats[qId].distribution[rating - 1] += 1;
+      }
+    }
+
+    if (dim === 'Bienestar') {
       wellbeingResponses++;
       if (rating <= 5) burnoutSignals++;
     }
@@ -122,17 +206,44 @@ function computeMetricsFromResponses(responses: any[]): {
   const total = responses.length;
   const globalScore = Number((totalRating / total).toFixed(1));
   const pctPromoters = Math.round((promoters / total) * 100);
+  const pctNeutrals = Math.round((neutrals / total) * 100);
   const pctDetractors = Math.round((detractors / total) * 100);
   const enps = pctPromoters - pctDetractors;
   const participationCount = uniqueQuestionIds.size > 0 ? Math.round(total / uniqueQuestionIds.size) : 0;
   const burnoutRisk = wellbeingResponses > 0 ? Math.round((burnoutSignals / wellbeingResponses) * 100) : 0;
 
-  return { globalScore, enps, participationCount, burnoutRisk };
+  const dimensionAvgs: Record<string, number> = {};
+  for (const [d, s] of Object.entries(dimStats)) {
+    dimensionAvgs[d] = Number((s.sum / s.count).toFixed(1));
+  }
+
+  const questionAvgs: Record<string, { text: string; dimension: string; avg: number; count: number; distribution: number[] }> = {};
+  for (const [qId, q] of Object.entries(qStats)) {
+    questionAvgs[qId] = {
+      text: q.text,
+      dimension: q.dimension,
+      avg: Number((q.sum / q.count).toFixed(1)),
+      count: q.count,
+      distribution: q.distribution,
+    };
+  }
+
+  return {
+    globalScore,
+    enps,
+    pctPromoters,
+    pctNeutrals,
+    pctDetractors,
+    participationCount,
+    burnoutRisk,
+    dimensionAvgs,
+    questionAvgs,
+  };
 }
 
 // ─── Hook ───────────────────────────────────────────────
 
-export function useDashboardData(campaignId?: string) {
+export function useDashboardData(campaignId?: string, compareCampaignId?: string) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const { campaigns } = useCampaigns();
@@ -140,18 +251,69 @@ export function useDashboardData(campaignId?: string) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Determine which campaign to load
-      let targetId = campaignId;
-      if (!targetId && campaigns.length > 0) {
-        targetId = campaigns[0].id;
-      }
-
-      if (!targetId) {
+      if (campaigns.length === 0) {
         setData(null);
         return;
       }
 
-      // 2. Fetch responses for this campaign with question text + dimension
+      // 1. Determine target campaign
+      let targetId = campaignId;
+      if (!targetId || !campaigns.some(c => c.id === targetId)) {
+        targetId = campaigns[0].id;
+      }
+
+      const currentCampaign = campaigns.find(c => c.id === targetId)!;
+
+      // 2. Fetch all campaign questions to group campaigns into Series
+      const { data: allQuestionsData } = await supabase
+        .from('questions')
+        .select('id, campaign_id, text, dimension, order_index')
+        .order('order_index', { ascending: true });
+
+      // Group questions by campaign
+      const questionsByCampaign: Record<string, { text: string; dimension: string }[]> = {};
+      (allQuestionsData || []).forEach((q: any) => {
+        if (!questionsByCampaign[q.campaign_id]) questionsByCampaign[q.campaign_id] = [];
+        questionsByCampaign[q.campaign_id].push({ text: q.text, dimension: q.dimension });
+      });
+
+      // Build question signature per campaign
+      const campaignSignature: Record<string, string> = {};
+      campaigns.forEach(c => {
+        const qList = questionsByCampaign[c.id] || [];
+        // Signature based on sorted text of questions or base title
+        const sig = qList.map(q => q.text.trim().toLowerCase()).sort().join('|');
+        campaignSignature[c.id] = sig || c.title.toLowerCase().replace(/q\d|\d{4}|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic/gi, '').trim();
+      });
+
+      // Group campaigns into Series
+      const seriesMap: Record<string, CampaignSeriesGroup> = {};
+      campaigns.forEach(c => {
+        const sig = campaignSignature[c.id];
+        const seriesKey = sig || 'general-series';
+        if (!seriesMap[seriesKey]) {
+          // Clean name from first campaign title
+          const cleanName = c.title.replace(/\s*-\s*q\d.*|\s*q\d.*|\s*\(\d{4}\).*/i, '').trim() || 'Encuesta de Clima';
+          seriesMap[seriesKey] = {
+            seriesId: seriesKey,
+            seriesName: cleanName,
+            campaigns: [],
+          };
+        }
+        seriesMap[seriesKey].campaigns.push({
+          id: c.id,
+          title: c.title,
+          periodLabel: c.period_label || c.title,
+          createdAt: c.created_at,
+        });
+      });
+
+      const allSeries = Object.values(seriesMap);
+      const currentSig = campaignSignature[targetId] || 'general-series';
+      const currentSeriesGroup = seriesMap[currentSig] || allSeries[0];
+      const seriesCampaigns = currentSeriesGroup ? currentSeriesGroup.campaigns : campaigns;
+
+      // 3. Fetch responses for target campaign
       const { data: responses, error: respError } = await supabase
         .from('responses')
         .select(`
@@ -170,44 +332,30 @@ export function useDashboardData(campaignId?: string) {
         return;
       }
 
-      // 3. Compute Metrics
-      let totalRating = 0;
-      let promoters = 0;
-      let neutrals = 0;
-      let detractors = 0;
+      // 4. Compute current campaign stats
+      const currentAnalysis = analyzeResponses(responses);
 
+      // Department & Location heatmaps
       const dimDeptStats: Record<string, Record<string, { sum: number, count: number }>> = {};
       const uniqueDepartments = new Set<string>();
       const dimLocStats: Record<string, Record<string, { sum: number, count: number }>> = {};
       const uniqueLocations = new Set<string>();
       const locationGlobalStats: Record<string, { sum: number, count: number }> = {};
 
-      // Question-level tracking for ranking
-      const questionStats: Record<string, { text: string; dimension: string; sum: number; count: number; distribution: number[] }> = {};
-
       responses.forEach((r: any) => {
         const rating = r.rating;
         const dept = r.department || 'General';
         const loc = r.location || 'Sede Central';
         const dimension = r.questions?.dimension || 'General';
-        const questionText = r.questions?.text || '';
-        const questionId = r.question_id || '';
 
         uniqueDepartments.add(dept);
         uniqueLocations.add(loc);
-        totalRating += rating;
 
-        if (rating >= 9) promoters++;
-        else if (rating >= 7) neutrals++;
-        else detractors++;
-
-        // Department heatmap
         if (!dimDeptStats[dimension]) dimDeptStats[dimension] = {};
         if (!dimDeptStats[dimension][dept]) dimDeptStats[dimension][dept] = { sum: 0, count: 0 };
         dimDeptStats[dimension][dept].sum += rating;
         dimDeptStats[dimension][dept].count += 1;
 
-        // Location heatmap
         if (!dimLocStats[dimension]) dimLocStats[dimension] = {};
         if (!dimLocStats[dimension][loc]) dimLocStats[dimension][loc] = { sum: 0, count: 0 };
         dimLocStats[dimension][loc].sum += rating;
@@ -216,78 +364,9 @@ export function useDashboardData(campaignId?: string) {
         if (!locationGlobalStats[loc]) locationGlobalStats[loc] = { sum: 0, count: 0 };
         locationGlobalStats[loc].sum += rating;
         locationGlobalStats[loc].count += 1;
-
-        // Question ranking
-        if (questionId) {
-          if (!questionStats[questionId]) {
-            questionStats[questionId] = { text: questionText, dimension, sum: 0, count: 0, distribution: new Array(10).fill(0) };
-          }
-          questionStats[questionId].sum += rating;
-          questionStats[questionId].count += 1;
-          if (rating >= 1 && rating <= 10) {
-            questionStats[questionId].distribution[rating - 1] += 1;
-          }
-        }
       });
 
-      const totalResponses = responses.length;
-      const globalScore = Number((totalRating / totalResponses).toFixed(1));
-      const pctPromoters = Math.round((promoters / totalResponses) * 100);
-      const pctNeutrals = Math.round((neutrals / totalResponses) * 100);
-      const pctDetractors = Math.round((detractors / totalResponses) * 100);
-      const enps = pctPromoters - pctDetractors;
-
-      const uniqueQuestionIds = new Set(responses.map((r: any) => r.question_id));
-      const participationCount = uniqueQuestionIds.size > 0 ? Math.round(totalResponses / uniqueQuestionIds.size) : 0;
-
-      let wellbeingResponses = 0;
-      let burnoutSignals = 0;
-      responses.forEach((r: any) => {
-        if (r.questions?.dimension === 'Bienestar') {
-          wellbeingResponses++;
-          if (r.rating <= 5) burnoutSignals++;
-        }
-      });
-      const burnoutRisk = wellbeingResponses > 0 ? Math.round((burnoutSignals / wellbeingResponses) * 100) : 0;
-
-      // 4. Compute deltas vs previous campaign
-      let globalDelta = 0;
-      let enpsDelta = 0;
-      let participationDelta = 0;
-      let burnoutDelta = 0;
-
-      const currentCampaignIndex = campaigns.findIndex(c => c.id === targetId);
-      if (currentCampaignIndex >= 0 && currentCampaignIndex < campaigns.length - 1) {
-        const prevCampaignId = campaigns[currentCampaignIndex + 1].id;
-        const { data: prevResponses } = await supabase
-          .from('responses')
-          .select(`rating, question_id, questions ( dimension )`)
-          .eq('campaign_id', prevCampaignId);
-
-        if (prevResponses && prevResponses.length > 0) {
-          const prev = computeMetricsFromResponses(prevResponses);
-          globalDelta = Number((globalScore - prev.globalScore).toFixed(1));
-          enpsDelta = enps - prev.enps;
-          participationDelta = participationCount - prev.participationCount;
-          burnoutDelta = burnoutRisk - prev.burnoutRisk;
-        }
-      }
-
-      const metrics: DashboardMetrics = {
-        globalScore,
-        globalDelta,
-        enps,
-        enpsDelta,
-        enpsPromoters: pctPromoters,
-        enpsNeutral: pctNeutrals,
-        enpsDetractors: pctDetractors,
-        participationCount,
-        participationDelta,
-        burnoutRisk,
-        burnoutDelta,
-      };
-
-      // 5. Construct Heatmaps
+      // Construct Heatmaps
       const heatmap: HeatmapData[] = [];
       for (const [dimension, depts] of Object.entries(dimDeptStats)) {
         const scores: Record<string, number> = {};
@@ -320,15 +399,233 @@ export function useDashboardData(campaignId?: string) {
         heatmapLocation.push({ dimension, scores });
       }
 
-      // 6. Quick Alerts — worst dimensions and departments
+      // 5. Determine comparison campaign (within same series if possible)
+      let compId = compareCampaignId;
+      if (!compId) {
+        // Find previous campaign in the same series
+        const seriesIdx = seriesCampaigns.findIndex(c => c.id === targetId);
+        if (seriesIdx >= 0 && seriesIdx < seriesCampaigns.length - 1) {
+          compId = seriesCampaigns[seriesIdx + 1].id;
+        } else if (campaigns.length > 1) {
+          const generalIdx = campaigns.findIndex(c => c.id === targetId);
+          if (generalIdx >= 0 && generalIdx < campaigns.length - 1) {
+            compId = campaigns[generalIdx + 1].id;
+          }
+        }
+      }
+
+      let compAnalysis: ReturnType<typeof analyzeResponses> | null = null;
+      let compCampaignTitle: string | null = null;
+
+      if (compId && compId !== targetId) {
+        const compCampObj = campaigns.find(c => c.id === compId);
+        if (compCampObj) compCampaignTitle = compCampObj.title;
+
+        const { data: compResponses } = await supabase
+          .from('responses')
+          .select(`
+            rating,
+            question_id,
+            questions ( text, dimension )
+          `)
+          .eq('campaign_id', compId);
+
+        if (compResponses && compResponses.length > 0) {
+          compAnalysis = analyzeResponses(compResponses);
+        }
+      }
+
+      // 6. Compute deltas vs comparison campaign
+      const globalDelta = compAnalysis ? Number((currentAnalysis.globalScore - compAnalysis.globalScore).toFixed(1)) : 0;
+      const enpsDelta = compAnalysis ? currentAnalysis.enps - compAnalysis.enps : 0;
+      const participationDelta = compAnalysis ? currentAnalysis.participationCount - compAnalysis.participationCount : 0;
+      const burnoutDelta = compAnalysis ? currentAnalysis.burnoutRisk - compAnalysis.burnoutRisk : 0;
+
+      const metrics: DashboardMetrics = {
+        globalScore: currentAnalysis.globalScore,
+        globalDelta,
+        enps: currentAnalysis.enps,
+        enpsDelta,
+        enpsPromoters: currentAnalysis.pctPromoters,
+        enpsNeutral: currentAnalysis.pctNeutrals,
+        enpsDetractors: currentAnalysis.pctDetractors,
+        participationCount: currentAnalysis.participationCount,
+        participationDelta,
+        burnoutRisk: currentAnalysis.burnoutRisk,
+        burnoutDelta,
+      };
+
+      // 7. Question-by-Question Comparison
+      const questionComparisons: QuestionComparison[] = [];
+      const questionRanking: QuestionRanking[] = [];
+
+      for (const [qId, qInfo] of Object.entries(currentAnalysis.questionAvgs)) {
+        // Find in compAnalysis by matching text
+        let prevScore: number | null = null;
+        if (compAnalysis) {
+          const match = Object.values(compAnalysis.questionAvgs).find(
+            cq => cq.text.trim().toLowerCase() === qInfo.text.trim().toLowerCase()
+          );
+          if (match) {
+            prevScore = match.avg;
+          }
+        }
+
+        const delta = prevScore !== null ? Number((qInfo.avg - prevScore).toFixed(1)) : null;
+        let status: QuestionComparison['status'] = 'new';
+        if (delta !== null) {
+          if (delta >= 0.3) status = 'improved';
+          else if (delta <= -0.3) status = 'declined';
+          else status = 'stable';
+        }
+
+        questionComparisons.push({
+          questionId: qId,
+          text: qInfo.text,
+          dimension: qInfo.dimension,
+          currentScore: qInfo.avg,
+          previousScore: prevScore,
+          delta,
+          status,
+          currentDistribution: qInfo.distribution,
+          totalResponses: qInfo.count,
+        });
+
+        questionRanking.push({
+          questionId: qId,
+          text: qInfo.text,
+          dimension: qInfo.dimension,
+          avgScore: qInfo.avg,
+          totalResponses: qInfo.count,
+          distribution: qInfo.distribution,
+        });
+      }
+
+      // Sort question rankings (worst first)
+      questionRanking.sort((a, b) => a.avgScore - b.avgScore);
+      // Sort question comparisons by delta (worst delta first to see concerns, or best first)
+      questionComparisons.sort((a, b) => (a.delta ?? 0) - (b.delta ?? 0));
+
+      // 8. Dimension-by-Dimension Comparison
+      const dimensionComparisons: DimensionComparison[] = [];
+      let improvedCount = 0;
+      let declinedCount = 0;
+      let stableCount = 0;
+      let topPosDim: string | null = null;
+      let topPosDelta = -999;
+      let topNegDim: string | null = null;
+      let topNegDelta = 999;
+
+      for (const [dim, score] of Object.entries(currentAnalysis.dimensionAvgs)) {
+        const prevScore = compAnalysis ? (compAnalysis.dimensionAvgs[dim] ?? null) : null;
+        const delta = prevScore !== null ? Number((score - prevScore).toFixed(1)) : null;
+        let status: DimensionComparison['status'] = 'stable';
+
+        if (delta !== null) {
+          if (delta >= 0.2) {
+            status = 'improved';
+            improvedCount++;
+            if (delta > topPosDelta) {
+              topPosDelta = delta;
+              topPosDim = dim;
+            }
+          } else if (delta <= -0.2) {
+            status = 'declined';
+            declinedCount++;
+            if (delta < topNegDelta) {
+              topNegDelta = delta;
+              topNegDim = dim;
+            }
+          } else {
+            status = 'stable';
+            stableCount++;
+          }
+        }
+
+        dimensionComparisons.push({
+          dimension: dim,
+          currentScore: score,
+          previousScore: prevScore,
+          delta,
+          status,
+        });
+      }
+
+      // Action Impact Summary diagnosis text
+      let diagnosisText = 'No hay suficientes ediciones previas para evaluar la repercusión de las medidas.';
+      if (compAnalysis) {
+        if (improvedCount > declinedCount) {
+          diagnosisText = `Efecto positivo detectado: ${improvedCount} de ${dimensionComparisons.length} dimensiones muestran una mejora respecto a la edición anterior.`;
+          if (topPosDim) {
+            diagnosisText += ` La mayor repercusión se observa en ${topPosDim} (+${topPosDelta}).`;
+          }
+        } else if (declinedCount > improvedCount) {
+          diagnosisText = `Alerta de seguimiento: ${declinedCount} dimensiones han retrocedido respecto a la edición anterior.`;
+          if (topNegDim) {
+            diagnosisText += ` Se recomienda revisar los planes de acción en ${topNegDim} (${topNegDelta}).`;
+          }
+        } else {
+          diagnosisText = `Resultados estables: la percepción general se mantiene alineada con la edición anterior (${stableCount} dimensiones sin cambios significativos).`;
+        }
+      }
+
+      const actionImpactSummary: ActionImpactSummary = {
+        improvedDimensionsCount: improvedCount,
+        declinedDimensionsCount: declinedCount,
+        stableDimensionsCount: stableCount,
+        topPositiveDimension: topPosDim,
+        topPositiveDelta: topPosDelta === -999 ? 0 : topPosDelta,
+        topConcernDimension: topNegDim,
+        topConcernDelta: topNegDelta === 999 ? 0 : topNegDelta,
+        diagnosisText,
+      };
+
+      // 9. Multi-wave Historical Trend (only for this series)
+      const historicalTrend: HistoricalPoint[] = [];
+      const orderedSeriesCampaigns = [...seriesCampaigns].reverse();
+
+      for (const sc of orderedSeriesCampaigns) {
+        if (sc.id === targetId) {
+          historicalTrend.push({
+            campaignId: sc.id,
+            campaignTitle: sc.title,
+            periodLabel: sc.periodLabel,
+            globalScore: currentAnalysis.globalScore,
+            enps: currentAnalysis.enps,
+            participation: currentAnalysis.participationCount,
+            burnoutRisk: currentAnalysis.burnoutRisk,
+            dimensions: currentAnalysis.dimensionAvgs,
+          });
+        } else {
+          const { data: scResp } = await supabase
+            .from('responses')
+            .select(`rating, question_id, questions ( text, dimension )`)
+            .eq('campaign_id', sc.id);
+
+          if (scResp && scResp.length > 0) {
+            const a = analyzeResponses(scResp);
+            historicalTrend.push({
+              campaignId: sc.id,
+              campaignTitle: sc.title,
+              periodLabel: sc.periodLabel,
+              globalScore: a.globalScore,
+              enps: a.enps,
+              participation: a.participationCount,
+              burnoutRisk: a.burnoutRisk,
+              dimensions: a.dimensionAvgs,
+            });
+          }
+        }
+      }
+
+      // 10. Quick Alerts for Dashboard
       const alerts: QuickAlert[] = [];
-      const dimensionAvgs = heatmap.map(h => {
+      const dimensionAvgsList = heatmap.map(h => {
         const vals = Object.values(h.scores);
         return { dimension: h.dimension, avg: vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0 };
       }).sort((a, b) => a.avg - b.avg);
 
-      // Worst 2 dimensions
-      dimensionAvgs.slice(0, 2).forEach(d => {
+      dimensionAvgsList.slice(0, 2).forEach(d => {
         if (d.avg < 8) {
           alerts.push({
             type: d.avg < 6 ? 'critical' : 'warning',
@@ -339,7 +636,6 @@ export function useDashboardData(campaignId?: string) {
         }
       });
 
-      // Worst department (by global avg across all dimensions)
       const deptAvgs: Record<string, { sum: number; count: number }> = {};
       heatmap.forEach(h => {
         for (const [dept, score] of Object.entries(h.scores)) {
@@ -361,54 +657,13 @@ export function useDashboardData(campaignId?: string) {
         });
       }
 
-      // 7. Sparklines — historical data from all campaigns
-      const sparkGlobal: SparklinePoint[] = [];
-      const sparkEnps: SparklinePoint[] = [];
-      const sparkParticipation: SparklinePoint[] = [];
-      const sparkBurnout: SparklinePoint[] = [];
-      const historicalTrend: HistoricalPoint[] = [];
+      // Sparklines across historical points
+      const sparkGlobal: SparklinePoint[] = historicalTrend.map(p => ({ label: p.periodLabel, value: p.globalScore }));
+      const sparkEnps: SparklinePoint[] = historicalTrend.map(p => ({ label: p.periodLabel, value: p.enps }));
+      const sparkParticipation: SparklinePoint[] = historicalTrend.map(p => ({ label: p.periodLabel, value: p.participation }));
+      const sparkBurnout: SparklinePoint[] = historicalTrend.map(p => ({ label: p.periodLabel, value: p.burnoutRisk }));
 
-      // Iterate campaigns from oldest to newest (campaigns are desc by created_at)
-      const orderedCampaigns = [...campaigns].reverse();
-      for (const camp of orderedCampaigns) {
-        if (camp.id === targetId) {
-          // Use already-computed values for current campaign
-          sparkGlobal.push({ label: camp.title, value: globalScore });
-          sparkEnps.push({ label: camp.title, value: enps });
-          sparkParticipation.push({ label: camp.title, value: participationCount });
-          sparkBurnout.push({ label: camp.title, value: burnoutRisk });
-          historicalTrend.push({ campaignTitle: camp.title, globalScore, enps, participation: participationCount });
-        } else {
-          // Fetch from DB for other campaigns
-          const { data: campResp } = await supabase
-            .from('responses')
-            .select(`rating, question_id, questions ( dimension )`)
-            .eq('campaign_id', camp.id);
-
-          if (campResp && campResp.length > 0) {
-            const m = computeMetricsFromResponses(campResp);
-            sparkGlobal.push({ label: camp.title, value: m.globalScore });
-            sparkEnps.push({ label: camp.title, value: m.enps });
-            sparkParticipation.push({ label: camp.title, value: m.participationCount });
-            sparkBurnout.push({ label: camp.title, value: m.burnoutRisk });
-            historicalTrend.push({ campaignTitle: camp.title, globalScore: m.globalScore, enps: m.enps, participation: m.participationCount });
-          }
-        }
-      }
-
-      // 8. Question ranking
-      const questionRanking: QuestionRanking[] = Object.entries(questionStats)
-        .map(([qId, stats]) => ({
-          questionId: qId,
-          text: stats.text,
-          dimension: stats.dimension,
-          avgScore: Number((stats.sum / stats.count).toFixed(1)),
-          totalResponses: stats.count,
-          distribution: stats.distribution,
-        }))
-        .sort((a, b) => a.avgScore - b.avgScore); // Worst first for attention
-
-      // 9. Active campaign info
+      // 11. Active campaign banner info
       const activeCampaign = campaigns.find(c => c.status === 'active');
       let activeCampaignInfo: DashboardData['activeCampaign'] = null;
       if (activeCampaign) {
@@ -428,11 +683,11 @@ export function useDashboardData(campaignId?: string) {
         activeCampaignInfo = {
           title: activeCampaign.title,
           responded,
-          total: 0, // We don't know the expected total without employee list
+          total: 0,
         };
       }
 
-      // 10. Generate AI Insights
+      // 12. AI Insights
       let insights: AIInsight[] = [];
       try {
         const aiResponse = await generateAIInsights(heatmap, metrics);
@@ -460,6 +715,12 @@ export function useDashboardData(campaignId?: string) {
         questionRanking,
         historicalTrend,
         activeCampaign: activeCampaignInfo,
+        allSeries,
+        currentSeriesId: currentSig,
+        questionComparisons,
+        dimensionComparisons,
+        actionImpactSummary,
+        comparisonCampaignTitle: compCampaignTitle,
       });
 
     } catch (err) {
@@ -468,7 +729,7 @@ export function useDashboardData(campaignId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [campaignId, campaigns]);
+  }, [campaignId, compareCampaignId, campaigns]);
 
   useEffect(() => {
     fetchData();

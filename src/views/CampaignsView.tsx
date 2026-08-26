@@ -14,7 +14,8 @@ import {
   Link as LinkIcon,
   X,
   Copy,
-  Share2
+  Share2,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useCampaigns } from '../hooks/useCampaigns';
@@ -24,6 +25,7 @@ import type { CampaignStatus } from '../lib/database.types';
 interface CampaignsViewProps {
   onCreateNew: () => void;
   onEdit: (campaignId: string) => void;
+  onRepeat: (campaignId: string) => void;
 }
 
 const STATUS_CONFIG: Record<CampaignStatus, { label: string; color: string; icon: React.ElementType }> = {
@@ -33,7 +35,7 @@ const STATUS_CONFIG: Record<CampaignStatus, { label: string; color: string; icon
   closed: { label: 'Cerrada', color: 'bg-purple-50 text-purple-600 border-purple-200', icon: CheckCircle2 },
 };
 
-export function CampaignsView({ onCreateNew, onEdit }: CampaignsViewProps) {
+export function CampaignsView({ onCreateNew, onEdit, onRepeat }: CampaignsViewProps) {
   const { campaigns, loading } = useCampaigns();
   const { segmentFields } = useEmployees();
   const [searchQuery, setSearchQuery] = useState('');
@@ -186,21 +188,33 @@ export function CampaignsView({ onCreateNew, onEdit }: CampaignsViewProps) {
 
                 <div>
                   {/* Action row */}
-                  <div className="flex items-center justify-between pt-4 border-t border-outline-variant/50 text-xs text-secondary font-medium">
+                  <div className="flex items-center justify-between pt-4 border-t border-outline-variant/50 text-xs text-secondary font-medium gap-2">
                     <button
                       onClick={() => setLinksModalCampaign({ id: campaign.id, title: campaign.title })}
-                      className="text-primary hover:underline font-bold flex items-center gap-1"
+                      className="text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer"
                     >
                       <Share2 className="w-3.5 h-3.5" />
-                      Copiar Enlaces
+                      Enlaces
                     </button>
-                    <button
-                      onClick={() => onEdit(campaign.id)}
-                      className="text-secondary hover:text-on-background font-semibold flex items-center gap-0.5"
-                    >
-                      <span>Editar</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onRepeat(campaign.id)}
+                        className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Crear una nueva edición de esta campaña con las mismas preguntas para ver su evolución temporal"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Repetir</span>
+                      </button>
+
+                      <button
+                        onClick={() => onEdit(campaign.id)}
+                        className="text-secondary hover:text-on-background font-semibold flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <span>Editar</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Progress bar for active campaigns */}

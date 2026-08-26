@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { Check, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Check, ArrowLeft, ArrowRight, RotateCcw, AlertCircle, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useEmployees, getDepartmentOptions, getLocationOptions } from '../hooks/useEmployees';
@@ -18,14 +17,15 @@ const STEPS = [
   { step: 4, label: 'Revisión' },
 ];
 
-export function WizardView({ onBack }: { onBack: () => void }) {
-  const { createCampaign, mockQuestions } = useCampaigns();
+export function WizardView({ onBack, repeatCampaignId }: { onBack: () => void; repeatCampaignId?: string | null }) {
+  const { createCampaign, mockQuestions, getCampaignWithQuestions } = useCampaigns();
   const { segmentFields } = useEmployees();
 
   // Current step (1 to 5, where 5 is the final link distribution step)
   const [currentStep, setCurrentStep] = useState(1);
   const [launching, setLaunching] = useState(false);
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
+  const [repeatedSourceTitle, setRepeatedSourceTitle] = useState<string | null>(null);
 
   // Default dates: Today & 14 days later
   const todayStr = new Date().toISOString().split('T')[0];
@@ -38,6 +38,32 @@ export function WizardView({ onBack }: { onBack: () => void }) {
 
   // Step 2: Questions
   const [questions, setQuestions] = useState<QuestionDraft[]>(mockQuestions);
+
+  // Load from repeated campaign if repeatCampaignId is supplied
+  useEffect(() => {
+    if (!repeatCampaignId) return;
+
+    async function loadSource() {
+      const data = await getCampaignWithQuestions(repeatCampaignId!);
+      if (data && data.campaign) {
+        setRepeatedSourceTitle(data.campaign.title);
+        setTitle(data.campaign.title);
+        setDescription(data.campaign.description || '');
+        setPeriodLabel('');
+        if (data.questions && data.questions.length > 0) {
+          setQuestions(data.questions.map(q => ({
+            id: q.id,
+            text: q.text,
+            dimension: q.dimension,
+            orderIndex: q.order_index,
+            isRequired: q.is_required,
+          })));
+        }
+      }
+    }
+
+    loadSource();
+  }, [repeatCampaignId, getCampaignWithQuestions]);
 
   // Step 3: Audience Filters
   const currentDepts = getDepartmentOptions(segmentFields);
@@ -170,6 +196,21 @@ export function WizardView({ onBack }: { onBack: () => void }) {
               );
             })}
           </div>
+
+          {/* Repeating Campaign Banner */}
+          {repeatedSourceTitle && (
+            <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3 text-emerald-900 animate-in fade-in">
+              <RotateCcw className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold">
+                  Nueva edición de la campaña: <span className="underline">{repeatedSourceTitle}</span>
+                </p>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  Las preguntas se han clonado de forma idéntica para permitir la comparativa histórica en Reporting y evaluar la repercusión de las medidas adoptadas.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -155,6 +155,34 @@ export function useCampaigns() {
     }
   }, [fetchCampaigns]);
 
+  const getCampaignWithQuestions = useCallback(async (id: string) => {
+    try {
+      const { data: campaign, error: cError } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (cError) throw cError;
+
+      const { data: questions, error: qError } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('campaign_id', id)
+        .order('order_index', { ascending: true });
+
+      if (qError) throw qError;
+
+      return {
+        campaign: campaign as Campaign,
+        questions: (questions || []) as Question[],
+      };
+    } catch (err) {
+      console.error('Error fetching campaign with questions:', err);
+      return null;
+    }
+  }, []);
+
   return {
     campaigns,
     loading,
@@ -162,6 +190,7 @@ export function useCampaigns() {
     fetchCampaigns,
     createCampaign,
     updateCampaignStatus,
+    getCampaignWithQuestions,
     mockQuestions: TEMPLATE_QUESTIONS,
   };
 }
