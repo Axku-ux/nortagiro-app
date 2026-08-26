@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useCampaigns } from '../hooks/useCampaigns';
-import { Heatmap } from '../components/dashboard/Heatmap';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -9,23 +8,50 @@ import {
   Activity, 
   AlertTriangle,
   RefreshCw,
-  Loader2
+  Loader2,
+  Flame,
+  ArrowRight,
+  Megaphone,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-export function DashboardView() {
-  const { campaigns } = useCampaigns();
-  const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
+// Tiny inline sparkline SVG component
+function Sparkline({ points, color }: { points: number[]; color: string }) {
+  if (points.length < 2) return null;
+  const h = 28;
+  const w = 80;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
 
-  // If 'all' is selected but we don't support 'all' easily in useDashboardData without backend changes,
-  // we can just pass undefined to get the latest campaign, or we can use the selected one.
-  const { data, loading, refetch } = useDashboardData(selectedCampaign === 'all' ? undefined : selectedCampaign);
+  const coords = points.map((v, i) => ({
+    x: (i / (points.length - 1)) * w,
+    y: h - ((v - min) / range) * (h - 4) - 2,
+  }));
+
+  const pathD = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x} ${c.y}`).join(' ');
+
+  return (
+    <svg width={w} height={h} className="inline-block">
+      <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={coords[coords.length - 1].x} cy={coords[coords.length - 1].y} r={3} fill={color} />
+    </svg>
+  );
+}
+
+export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => void }) {
+  const { campaigns } = useCampaigns();
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('');
+
+  const effectiveCampaignId = selectedCampaign || undefined;
+  const { data, loading, refetch } = useDashboardData(effectiveCampaignId);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refetch();
-    setTimeout(() => setIsRefreshing(false), 500); // Visual feedback
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   if (loading && !data) {
@@ -47,13 +73,13 @@ export function DashboardView() {
         </div>
         <h2 className="text-2xl font-bold text-on-background mb-2">Aún no hay datos</h2>
         <p className="text-secondary max-w-md mx-auto">
-          No tienes campañas cerradas o activas con suficientes respuestas. Lanza una nueva campaña para empezar a ver insights.
+          No tienes campañas con respuestas. Lanza una nueva campaña para empezar a ver tu pulso organizacional.
         </p>
       </div>
     );
   }
 
-  const { metrics, heatmap, departments, heatmapLocation, locations } = data;
+  const { metrics, alerts, sparklines, activeCampaign } = data;
 
   const kpiCards = [
     {
@@ -61,41 +87,58 @@ export function DashboardView() {
       value: metrics.globalScore.toFixed(1),
       suffix: '/10',
       delta: metrics.globalDelta,
+      deltaSuffix: '',
+      sparkData: sparklines.globalScore.map(p => p.value),
       icon: Activity,
-      color: 'blue'
+      sparkColor: '#3b82f6',
+      bgColor: 'bg-blue-50',
+      iconColor: 'text-blue-600',
     },
     {
       title: 'eNPS',
       value: metrics.enps > 0 ? `+${metrics.enps}` : metrics.enps.toString(),
-      delta: null, // Custom eNPS bar rendered below
+      delta: metrics.enpsDelta,
+      deltaSuffix: '',
+      sparkData: sparklines.enps.map(p => p.value),
       icon: Users,
-      color: 'emerald'
+      sparkColor: '#10b981',
+      bgColor: 'bg-emerald-50',
+      iconColor: 'text-emerald-600',
+      customFooter: true,
     },
     {
       title: 'Participación',
       value: metrics.participationCount.toString(),
       suffix: ' resp.',
       delta: metrics.participationDelta,
+      deltaSuffix: '',
+      sparkData: sparklines.participation.map(p => p.value),
       icon: TrendingUp,
-      color: 'indigo'
+      sparkColor: '#6366f1',
+      bgColor: 'bg-indigo-50',
+      iconColor: 'text-indigo-600',
     },
     {
       title: 'Riesgo Burnout',
       value: `${metrics.burnoutRisk}%`,
       delta: metrics.burnoutDelta,
-      icon: AlertTriangle,
-      color: 'rose',
-      inverseDelta: true // Lower is better
-    }
+      deltaSuffix: '%',
+      sparkData: sparklines.burnout.map(p => p.value),
+      icon: Flame,
+      sparkColor: '#f43f5e',
+      bgColor: 'bg-rose-50',
+      iconColor: 'text-rose-600',
+      inverseDelta: true,
+    },
   ];
 
   return (
-    <div className="p-4 md:p-8 space-y-8 w-full max-w-[1440px] mx-auto animate-in fade-in duration-500 pb-20">
+    <div className="p-4 md:p-8 space-y-6 w-full max-w-[1440px] mx-auto animate-in fade-in duration-500 pb-20">
       {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl md:text-4xl font-bold text-on-background tracking-tight">Dashboard</h2>
-          <p className="text-lg text-on-surface-variant mt-1">Resumen ejecutivo y pulso organizacional.</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-on-background tracking-tight">Pulso Ejecutivo</h2>
+          <p className="text-base text-on-surface-variant mt-1">Vista rápida del estado de tu organización.</p>
         </div>
         <div className="flex items-center gap-3">
           <select 
@@ -103,14 +146,14 @@ export function DashboardView() {
             onChange={(e) => setSelectedCampaign(e.target.value)}
             className="bg-surface border border-outline-variant rounded-xl px-4 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-variant transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-primary-fixed-dim"
           >
-            {campaigns.length === 0 && <option value="all">Sin Campañas</option>}
+            {campaigns.length === 0 && <option value="">Sin Campañas</option>}
             {campaigns.map(c => (
               <option key={c.id} value={c.id}>{c.title}</option>
             ))}
           </select>
           <button 
             onClick={handleRefresh}
-            className="p-2.5 bg-surface border border-outline-variant rounded-xl hover:bg-surface-variant transition-colors text-secondary"
+            className="p-2.5 bg-surface border border-outline-variant rounded-xl hover:bg-surface-variant transition-colors text-secondary cursor-pointer"
             title="Actualizar datos"
           >
             <RefreshCw className={cn("w-5 h-5", isRefreshing && "animate-spin text-primary")} />
@@ -118,33 +161,54 @@ export function DashboardView() {
         </div>
       </header>
 
+      {/* Active Campaign Banner */}
+      {activeCampaign && (
+        <div className="card p-4 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-primary/20 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/15 rounded-xl flex items-center justify-center">
+              <Megaphone className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-on-background">Campaña activa: {activeCampaign.title}</p>
+              <p className="text-xs text-secondary mt-0.5">
+                {activeCampaign.responded} encuestas completadas hasta ahora
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigate?.('campaigns')}
+            className="text-xs font-bold text-primary flex items-center gap-1 hover:underline cursor-pointer shrink-0"
+          >
+            Ver campaña <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {kpiCards.map((kpi) => {
           const isGoodDelta = kpi.inverseDelta ? (kpi.delta || 0) <= 0 : (kpi.delta || 0) >= 0;
+          const hasDelta = kpi.delta !== 0;
           
           return (
-            <div key={kpi.title} className="card p-6 flex flex-col justify-between group">
-              <div className="flex items-start justify-between mb-4">
+            <div key={kpi.title} className="card p-5 flex flex-col justify-between group">
+              <div className="flex items-start justify-between mb-3">
                 <p className="text-xs font-bold text-secondary uppercase tracking-wider">{kpi.title}</p>
-                <div className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110",
-                  `bg-${kpi.color}-50 text-${kpi.color}-600`
-                )}>
-                  <kpi.icon className="w-5 h-5" />
+                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", kpi.bgColor)}>
+                  <kpi.icon className={cn("w-4.5 h-4.5", kpi.iconColor)} />
                 </div>
               </div>
               
-              <div className="flex items-end gap-2">
-                <h3 className="text-4xl font-bold tracking-tight text-on-background">
+              <div className="flex items-end justify-between gap-2">
+                <h3 className="text-3xl font-bold tracking-tight text-on-background">
                   {kpi.value}
-                  {kpi.suffix && <span className="text-xl text-outline ml-1 font-medium">{kpi.suffix}</span>}
+                  {kpi.suffix && <span className="text-base text-outline ml-1 font-medium">{kpi.suffix}</span>}
                 </h3>
+                <Sparkline points={kpi.sparkData} color={kpi.sparkColor} />
               </div>
 
-              <div className="mt-4 pt-4 border-t border-outline-variant/50 flex items-center justify-between">
-                {/* Custom render for eNPS bar */}
-                {kpi.title === 'eNPS' ? (
+              <div className="mt-3 pt-3 border-t border-outline-variant/50 flex items-center justify-between">
+                {kpi.customFooter ? (
                   <div className="w-full flex items-center gap-2">
                     <div className="flex-1 h-2 rounded-full overflow-hidden flex">
                       <div style={{ width: `${metrics.enpsPromoters}%` }} className="bg-emerald-500" />
@@ -152,38 +216,59 @@ export function DashboardView() {
                       <div style={{ width: `${metrics.enpsDetractors}%` }} className="bg-rose-500" />
                     </div>
                   </div>
-                ) : kpi.delta !== null ? (
+                ) : hasDelta ? (
                   <div className={cn(
-                    "flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full",
+                    "flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full",
                     isGoodDelta ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
                   )}>
-                    {kpi.delta! > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                    {Math.abs(kpi.delta!)}{kpi.title === 'Riesgo Burnout' ? '%' : ''} vs Q anterior
+                    {kpi.delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                    {kpi.delta > 0 ? '+' : ''}{kpi.delta}{kpi.deltaSuffix} vs anterior
                   </div>
-                ) : null}
+                ) : (
+                  <span className="text-xs text-outline">Sin datos previos</span>
+                )}
               </div>
             </div>
           );
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {/* Heatmap Departamentos */}
-        <Heatmap 
-          data={heatmap} 
-          columns={departments} 
-          title="Mapa de Calor por Área"
-          subtitle="Puntuaciones agregadas por dimensión y departamento."
-        />
-        
-        {/* Heatmap Ubicaciones */}
-        <Heatmap 
-          data={heatmapLocation} 
-          columns={locations} 
-          title="Mapa de Calor por Ubicación"
-          subtitle="Mejores y peores sucursales (Top 3 y Bottom 3)."
-        />
-      </div>
+      {/* Quick Alerts */}
+      {alerts.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="p-4 border-b border-outline-variant/50 bg-surface-container-lowest flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4.5 h-4.5 text-amber-600" />
+              <h3 className="text-sm font-bold text-on-background uppercase tracking-wider">Alertas Rápidas</h3>
+            </div>
+            <button 
+              onClick={() => onNavigate?.('reporting')} 
+              className="text-xs font-bold text-primary flex items-center gap-1 hover:underline cursor-pointer"
+            >
+              Investigar en Analítica <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="divide-y divide-outline-variant/30">
+            {alerts.map((alert, i) => (
+              <div key={i} className="px-5 py-3 flex items-center gap-3">
+                <div className={cn(
+                  "w-2 h-2 rounded-full shrink-0",
+                  alert.type === 'critical' ? 'bg-rose-500' : 'bg-amber-500'
+                )} />
+                <p className="text-sm text-on-surface-variant">{alert.text}</p>
+                {alert.score !== undefined && (
+                  <span className={cn(
+                    "ml-auto shrink-0 text-xs font-extrabold px-2.5 py-0.5 rounded-full",
+                    alert.score < 6 ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"
+                  )}>
+                    {alert.score}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

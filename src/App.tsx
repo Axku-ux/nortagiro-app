@@ -159,7 +159,7 @@ function AppShell({ user, onSignOut }: AppShellProps) {
         <TopNav />
         <div className="flex-1 overflow-y-auto pb-24 md:pb-0 relative bg-surface-bright">
           <ViewErrorBoundary>
-            {currentView === 'dashboard' && <DashboardView />}
+            {currentView === 'dashboard' && <DashboardView onNavigate={(v) => setCurrentView(v as View)} />}
             {currentView === 'campaigns' && (
               <CampaignsView 
                 onCreateNew={() => setCurrentView('wizard')}
