@@ -1,4 +1,5 @@
-import { Check, ArrowLeft, ArrowRight, RotateCcw, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, ArrowLeft, ArrowRight, RotateCcw, AlertCircle, Sparkles, FileEdit } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useCampaigns } from '../hooks/useCampaigns';
 import { useEmployees, getDepartmentOptions, getLocationOptions } from '../hooks/useEmployees';
@@ -17,7 +18,15 @@ const STEPS = [
   { step: 4, label: 'Revisión' },
 ];
 
-export function WizardView({ onBack, repeatCampaignId }: { onBack: () => void; repeatCampaignId?: string | null }) {
+export function WizardView({ 
+  onBack, 
+  repeatCampaignId, 
+  editCampaignId 
+}: { 
+  onBack: () => void; 
+  repeatCampaignId?: string | null;
+  editCampaignId?: string | null;
+}) {
   const { createCampaign, mockQuestions, getCampaignWithQuestions } = useCampaigns();
   const { segmentFields } = useEmployees();
 
@@ -26,6 +35,7 @@ export function WizardView({ onBack, repeatCampaignId }: { onBack: () => void; r
   const [launching, setLaunching] = useState(false);
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null);
   const [repeatedSourceTitle, setRepeatedSourceTitle] = useState<string | null>(null);
+  const [editingSourceTitle, setEditingSourceTitle] = useState<string | null>(null);
 
   // Default dates: Today & 14 days later
   const todayStr = new Date().toISOString().split('T')[0];
@@ -39,17 +49,29 @@ export function WizardView({ onBack, repeatCampaignId }: { onBack: () => void; r
   // Step 2: Questions
   const [questions, setQuestions] = useState<QuestionDraft[]>(mockQuestions);
 
-  // Load from repeated campaign if repeatCampaignId is supplied
+  // Load from campaign if repeatCampaignId or editCampaignId is supplied
   useEffect(() => {
-    if (!repeatCampaignId) return;
+    const targetId = repeatCampaignId || editCampaignId;
+    if (!targetId) return;
 
     async function loadSource() {
-      const data = await getCampaignWithQuestions(repeatCampaignId!);
+      const data = await getCampaignWithQuestions(targetId!);
       if (data && data.campaign) {
-        setRepeatedSourceTitle(data.campaign.title);
-        setTitle(data.campaign.title);
-        setDescription(data.campaign.description || '');
-        setPeriodLabel('');
+        if (repeatCampaignId) {
+          setRepeatedSourceTitle(data.campaign.title);
+          setTitle(data.campaign.title);
+          setDescription(data.campaign.description || '');
+          setPeriodLabel('');
+        } else if (editCampaignId) {
+          setEditingSourceTitle(data.campaign.title);
+          setTitle(data.campaign.title);
+          setDescription(data.campaign.description || '');
+          setPeriodLabel(data.campaign.period_label || '');
+          if (data.campaign.starts_at) setStartsAt(data.campaign.starts_at.split('T')[0]);
+          if (data.campaign.ends_at) setEndsAt(data.campaign.ends_at.split('T')[0]);
+          if (data.campaign.reminder_config) setReminderConfig(data.campaign.reminder_config);
+        }
+
         if (data.questions && data.questions.length > 0) {
           setQuestions(data.questions.map(q => ({
             id: q.id,
@@ -63,7 +85,7 @@ export function WizardView({ onBack, repeatCampaignId }: { onBack: () => void; r
     }
 
     loadSource();
-  }, [repeatCampaignId, getCampaignWithQuestions]);
+  }, [repeatCampaignId, editCampaignId, getCampaignWithQuestions]);
 
   // Step 3: Audience Filters
   const currentDepts = getDepartmentOptions(segmentFields);
@@ -207,6 +229,21 @@ export function WizardView({ onBack, repeatCampaignId }: { onBack: () => void; r
                 </p>
                 <p className="text-xs text-emerald-700 mt-0.5">
                   Las preguntas se han clonado de forma idéntica para permitir la comparativa histórica en Reporting y evaluar la repercusión de las medidas adoptadas.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Editing Campaign Banner */}
+          {editingSourceTitle && !repeatedSourceTitle && (
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3 text-blue-900 animate-in fade-in">
+              <FileEdit className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold">
+                  Editando campaña: <span className="underline">{editingSourceTitle}</span>
+                </p>
+                <p className="text-xs text-blue-700 mt-0.5">
+                  Puedes ajustar la configuración, fechas y preguntas de la encuesta.
                 </p>
               </div>
             </div>

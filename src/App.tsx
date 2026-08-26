@@ -184,8 +184,10 @@ function AppShell({ user, onSignOut }: AppShellProps) {
             {currentView === 'wizard' && (
               <WizardView 
                 repeatCampaignId={repeatingCampaignId}
+                editCampaignId={editingCampaignId}
                 onBack={() => {
                   setRepeatingCampaignId(null);
+                  setEditingCampaignId(null);
                   setCurrentView('campaigns');
                 }} 
               />
