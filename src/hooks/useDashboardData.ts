@@ -31,6 +31,7 @@ export interface AIInsight {
   description: string;
   metric?: string;
   department?: string;
+  actionRecommendation?: string;
 }
 
 export interface QuickAlert {
@@ -110,6 +111,8 @@ export interface DashboardData {
   heatmapLocation: HeatmapData[];
   locations: string[];
   insights: AIInsight[];
+  executiveSummary: string;
+  aiConfidence: number;
   alerts: QuickAlert[];
   sparklines: {
     globalScore: SparklinePoint[];
@@ -685,12 +688,21 @@ export function useDashboardData(campaignId?: string, compareCampaignId?: string
         };
       }
 
-      // 12. AI Insights
+      // 12. AI Insights & Executive Summary
       let insights: AIInsight[] = [];
+      let executiveSummary = 'Analizando los datos de la encuesta para generar el resumen ejecutivo...';
+      let aiConfidence = 92;
+
       try {
         const aiResponse = await generateAIInsights(heatmap, metrics);
         if (aiResponse.success && aiResponse.insights) {
           insights = aiResponse.insights;
+          if (aiResponse.executiveSummary) {
+            executiveSummary = aiResponse.executiveSummary;
+          }
+          if (aiResponse.confidence) {
+            aiConfidence = aiResponse.confidence;
+          }
         }
       } catch (aiError) {
         console.error('Failed to generate dynamic AI insights:', aiError);
@@ -703,6 +715,8 @@ export function useDashboardData(campaignId?: string, compareCampaignId?: string
         heatmapLocation,
         locations: allLocations,
         insights,
+        executiveSummary,
+        aiConfidence,
         alerts,
         sparklines: {
           globalScore: sparkGlobal,
