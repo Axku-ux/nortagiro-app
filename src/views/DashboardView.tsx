@@ -54,6 +54,8 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
+  const currentCampaignId = selectedCampaign || data?.currentCampaignId || campaigns[0]?.id || '';
+
   if (loading && !data) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[500px]">
@@ -65,21 +67,46 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
     );
   }
 
-  if (!data) {
+  if (campaigns.length === 0) {
     return (
       <div className="p-8 text-center min-h-[500px] flex flex-col items-center justify-center">
         <div className="w-16 h-16 bg-surface-variant rounded-full flex items-center justify-center mb-4">
           <Activity className="w-8 h-8 text-secondary" />
         </div>
-        <h2 className="text-2xl font-bold text-on-background mb-2">Aún no hay datos</h2>
-        <p className="text-secondary max-w-md mx-auto">
-          No tienes campañas con respuestas. Lanza una nueva campaña para empezar a ver tu pulso organizacional.
+        <h2 className="text-2xl font-bold text-on-background mb-2">Aún no hay campañas</h2>
+        <p className="text-secondary max-w-md mx-auto mb-4">
+          Crea tu primera campaña para empezar a medir el clima laboral de tu organización.
         </p>
+        {onNavigate && (
+          <button
+            onClick={() => onNavigate('wizard')}
+            className="bg-primary text-on-primary font-bold px-5 py-2.5 rounded-xl hover:bg-primary-container transition-all cursor-pointer"
+          >
+            Crear Campaña
+          </button>
+        )}
       </div>
     );
   }
 
-  const { metrics, alerts, sparklines, activeCampaign } = data;
+  const metrics = data?.metrics || {
+    globalScore: 0,
+    globalDelta: null,
+    enps: 0,
+    enpsDelta: null,
+    pctPromoters: 0,
+    pctNeutrals: 0,
+    pctDetractors: 0,
+    participationCount: 0,
+    participationDelta: null,
+    burnoutRisk: 0,
+    burnoutDelta: null,
+  };
+
+  const alerts = data?.alerts || [];
+  const sparklines = data?.sparklines || { globalScore: [], enps: [], participation: [], burnout: [] };
+  const activeCampaign = data?.activeCampaign || null;
+  const hasResponses = data?.hasResponses ?? false;
 
   const kpiCards = [
     {
@@ -142,13 +169,13 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
         </div>
         <div className="flex items-center gap-3">
           <select 
-            value={selectedCampaign}
+            value={currentCampaignId}
             onChange={(e) => setSelectedCampaign(e.target.value)}
             className="bg-surface border border-outline-variant rounded-xl px-4 py-2.5 text-sm font-medium text-on-surface hover:bg-surface-variant transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-primary-fixed-dim"
           >
             {campaigns.length === 0 && <option value="">Sin Campañas</option>}
             {campaigns.map(c => (
-              <option key={c.id} value={c.id}>{c.title}</option>
+              <option key={c.id} value={c.id}>{c.title} ({c.period_label || 'Sin periodo'})</option>
             ))}
           </select>
           <button 
@@ -160,6 +187,31 @@ export function DashboardView({ onNavigate }: { onNavigate?: (view: string) => v
           </button>
         </div>
       </header>
+
+      {/* Notice if campaign has 0 responses */}
+      {!hasResponses && (
+        <div className="card p-6 bg-amber-50/50 border border-amber-200/80 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+              <Activity className="w-5 h-5 text-amber-700" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-950">Esta edición aún no cuenta con respuestas registradas</p>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Distribuye los enlaces de encuesta para recopilar respuestas o selecciona otra campaña en el selector superior.
+              </p>
+            </div>
+          </div>
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('campaigns')}
+              className="text-xs font-bold bg-amber-700 text-white hover:bg-amber-800 px-3.5 py-2 rounded-lg transition-colors cursor-pointer shrink-0"
+            >
+              Ver Enlaces de Encuesta
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Active Campaign Banner */}
       {activeCampaign && (

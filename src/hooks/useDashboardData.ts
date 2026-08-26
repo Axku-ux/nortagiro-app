@@ -105,6 +105,8 @@ export interface CampaignSeriesGroup {
 }
 
 export interface DashboardData {
+  hasResponses: boolean;
+  currentCampaignId: string;
   metrics: DashboardMetrics;
   heatmap: HeatmapData[];
   departments: string[];
@@ -259,10 +261,18 @@ export function useDashboardData(campaignId?: string, compareCampaignId?: string
         return;
       }
 
-      // 1. Determine target campaign
+      // 1. Check which campaigns have responses to set smart default
+      const { data: responseRows } = await supabase
+        .from('responses')
+        .select('campaign_id');
+
+      const campaignsWithResponses = new Set((responseRows || []).map((r: any) => r.campaign_id));
+
       let targetId = campaignId;
       if (!targetId || !campaigns.some(c => c.id === targetId)) {
-        targetId = campaigns[0].id;
+        // Pick the most recent campaign that has responses, or fallback to the first
+        const firstWithResponses = campaigns.find(c => campaignsWithResponses.has(c.id));
+        targetId = firstWithResponses ? firstWithResponses.id : campaigns[0].id;
       }
 
       const currentCampaign = campaigns.find(c => c.id === targetId)!;
@@ -278,15 +288,6 @@ export function useDashboardData(campaignId?: string, compareCampaignId?: string
       (allQuestionsData || []).forEach((q: any) => {
         if (!questionsByCampaign[q.campaign_id]) questionsByCampaign[q.campaign_id] = [];
         questionsByCampaign[q.campaign_id].push({ text: q.text, dimension: q.dimension });
-      });
-
-      // Build question signature per campaign
-      const campaignSignature: Record<string, string> = {};
-      campaigns.forEach(c => {
-        const qList = questionsByCampaign[c.id] || [];
-        // Signature based on sorted text of questions or base title
-        const sig = qList.map(q => q.text.trim().toLowerCase()).sort().join('|');
-        campaignSignature[c.id] = sig || c.title.toLowerCase().replace(/q\d|\d{4}|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic/gi, '').trim();
       });
 
       // Group campaigns into Programs / Series
@@ -329,7 +330,55 @@ export function useDashboardData(campaignId?: string, compareCampaignId?: string
       if (respError) throw respError;
 
       if (!responses || responses.length === 0) {
-        setData(null);
+        setData({
+          hasResponses: false,
+          currentCampaignId: targetId,
+          metrics: {
+            globalScore: 0,
+            globalDelta: null,
+            enps: 0,
+            enpsDelta: null,
+            pctPromoters: 0,
+            pctNeutrals: 0,
+            pctDetractors: 0,
+            participationCount: 0,
+            participationDelta: null,
+            burnoutRisk: 0,
+            burnoutDelta: null,
+          },
+          heatmap: [],
+          departments: [],
+          heatmapLocation: [],
+          locations: [],
+          insights: [],
+          executiveSummary: 'Esta campaña aún no cuenta con respuestas registradas.',
+          aiConfidence: 0,
+          alerts: [],
+          sparklines: {
+            globalScore: [],
+            enps: [],
+            participation: [],
+            burnout: [],
+          },
+          questionRanking: [],
+          historicalTrend: [],
+          activeCampaign: null,
+          allSeries,
+          currentSeriesId: currentProgramName,
+          questionComparisons: [],
+          dimensionComparisons: [],
+          actionImpactSummary: {
+            improvedDimensionsCount: 0,
+            declinedDimensionsCount: 0,
+            stableDimensionsCount: 0,
+            topPositiveDimension: null,
+            topPositiveDelta: 0,
+            topConcernDimension: null,
+            topConcernDelta: 0,
+            diagnosisText: 'Sin datos previos para comparar.',
+          },
+          comparisonCampaignTitle: null,
+        });
         return;
       }
 
@@ -709,6 +758,8 @@ export function useDashboardData(campaignId?: string, compareCampaignId?: string
       }
 
       setData({
+        hasResponses: true,
+        currentCampaignId: targetId,
         metrics,
         heatmap,
         departments: Array.from(uniqueDepartments),
@@ -728,7 +779,7 @@ export function useDashboardData(campaignId?: string, compareCampaignId?: string
         historicalTrend,
         activeCampaign: activeCampaignInfo,
         allSeries,
-        currentSeriesId: currentSig,
+        currentSeriesId: currentProgramName,
         questionComparisons,
         dimensionComparisons,
         actionImpactSummary,

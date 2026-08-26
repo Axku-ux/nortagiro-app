@@ -255,7 +255,7 @@ export function ReportingView() {
             <Calendar className="w-4 h-4 text-secondary" />
             <span className="text-xs font-bold text-secondary uppercase tracking-wider">Edición Actual:</span>
             <select
-              value={selectedCampaignId || (campaigns[0]?.id ?? '')}
+              value={selectedCampaignId || data?.currentCampaignId || campaigns[0]?.id || ''}
               onChange={(e) => setSelectedCampaignId(e.target.value)}
               className="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-sm font-bold text-on-surface focus:outline-none focus:border-primary shadow-sm"
             >
@@ -293,10 +293,21 @@ export function ReportingView() {
             <span>Comparando:</span>
             <span className="font-bold text-on-background">{data.comparisonCampaignTitle}</span>
             <ArrowRight className="w-3 h-3 text-primary" />
-            <span className="font-bold text-primary">{campaigns.find(c => c.id === (selectedCampaignId || campaigns[0]?.id))?.title}</span>
+            <span className="font-bold text-primary">{campaigns.find(c => c.id === (selectedCampaignId || data?.currentCampaignId || campaigns[0]?.id))?.title}</span>
           </div>
         )}
       </div>
+
+      {/* Notice if campaign has 0 responses */}
+      {data && !data.hasResponses && (
+        <div className="card p-6 bg-amber-50/50 border border-amber-200/80 rounded-xl flex items-center gap-3">
+          <History className="w-5 h-5 text-amber-700 shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-amber-950">Esta edición aún no cuenta con respuestas para analizar</p>
+            <p className="text-xs text-amber-800 mt-0.5">Selecciona otra edición con respuestas en el selector superior para ver su analítica evolutiva.</p>
+          </div>
+        </div>
+      )}
 
       {!data ? (
         <div className="card p-12 text-center">
