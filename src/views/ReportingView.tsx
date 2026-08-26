@@ -19,7 +19,8 @@ import {
   Activity,
   History,
   GitCompare,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -171,6 +172,17 @@ export function ReportingView() {
     return 'bg-rose-500/15 text-rose-700';
   };
 
+  if (loading && !data) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[500px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 text-primary animate-spin" />
+          <p className="text-sm text-secondary font-medium">Cargando analítica y comparativas...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-8 space-y-8 w-full max-w-[1440px] mx-auto animate-in fade-in duration-500 pb-32">
       {/* Toast alert */}
@@ -214,11 +226,11 @@ export function ReportingView() {
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-primary" />
             <span className="text-xs font-bold text-secondary uppercase tracking-wider">Programa:</span>
-            {data.allSeries.length > 1 ? (
+            {data?.allSeries && data.allSeries.length > 1 ? (
               <select
                 value={data.currentSeriesId}
                 onChange={(e) => {
-                  const targetSeries = data.allSeries.find(s => s.seriesId === e.target.value);
+                  const targetSeries = data?.allSeries?.find(s => s.seriesId === e.target.value);
                   if (targetSeries && targetSeries.campaigns.length > 0) {
                     setSelectedCampaignId(targetSeries.campaigns[0].id);
                   }
